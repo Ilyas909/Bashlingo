@@ -1,2 +1,2 @@
 fastapi[all]
-sqlite3
+uvicorn
