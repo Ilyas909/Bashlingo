@@ -12,7 +12,7 @@ import json
 
 
 app = FastAPI()
-+
+
 # Настройка CORS
 origins = [
     "http://localhost:3000",  # Если ваш React-приложение работает на этом порту
@@ -94,10 +94,14 @@ def authentication(login: Login):
 
     if role == "teacher":
         response = JSONResponse(content={"id": client[0], "username": client[3], "avatar": client[2], "role": role})
+        #response.set_cookie(key="session", value=session_id)
         response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
+
     elif role == "student":
         response = JSONResponse(content={"id": client[0], "username": client[4], "avatar": client[3], "role": role})
+        #response.set_cookie(key="session", value=session_id)
         response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
+
     save_session_data()
     return response
 
