@@ -12,7 +12,7 @@ import json
 
 
 app = FastAPI()
-
++
 # Настройка CORS
 origins = [
     "http://localhost:3000",  # Если ваш React-приложение работает на этом порту
@@ -248,8 +248,7 @@ def create_lesson(lessonData: GetWords, request: Request):
 
 @app.get("/classes/fetch-lesson/{lessonId}")
 def fetch_lesson_by_Id(lessonId: int, request: Request):
-    #userId = get_current_teacher(request)
-    userId = 1
+    userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
         res = get_lesson_by_id(lessonId)
         return res
@@ -259,8 +258,7 @@ def fetch_lesson_by_Id(lessonId: int, request: Request):
 
 @app.post("/classes/update-lesson")
 def set_lesson_availability(availability: Entityt, request: Request):
-    # userId = get_current_teacher(request)
-    userId = 1
+    userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
         res = lesson_availability(availability)
         return res
@@ -270,8 +268,7 @@ def set_lesson_availability(availability: Entityt, request: Request):
 
 @app.delete('/classes/delete-lesson/{lessonId}/{classId}')
 def delete_lesson(lessonId: int, classId: int, request: Request):
-    # userId = get_current_teacher(request)
-    userId = 1
+    userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
         res = delete_lesson_by_id(lessonId, classId)
         return res
@@ -281,8 +278,7 @@ def delete_lesson(lessonId: int, classId: int, request: Request):
 
 @app.put('/classes/get-lesson-results')
 def fetch_lesson_results_by_Id(lessonId: EntityId, request: Request):
-    # userId = get_current_teacher(request)
-    userId = 1
+    userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
         res = fetch_lesson_results(lessonId)
         return res
@@ -306,7 +302,6 @@ def edit_lesson(edit: GetWords, request: Request):
 @app.put('/user/username')
 def update_username(username: User, request: Request):
     userId = get_current_student(request)
-    userId = 1
     if not isinstance(userId, JSONResponse):
         res = username_update(userId, username.username)
         return res
@@ -328,7 +323,6 @@ def create_upload_file(request: Request, file: UploadFile = File(...)):
 
 def compliance_check(lessonId, request: Request):
     userId = get_current_student(request)
-    userId = 1
     if not isinstance(userId, JSONResponse):
         res = check_student(userId, lessonId)
         return res
@@ -348,7 +342,6 @@ def get_correspondence_tasks(lessonId: int, request: Request):
 @app.post('/tasks/speaking')
 def send_speaking_answer(request: Request, file: UploadFile = File(...)):
     userId = get_current_student(request)
-    userId = 1
     if not isinstance(userId, JSONResponse):
         username = get_username(userId)
         file_path = f"static/speaking_answer/{username}.mp3"
@@ -379,7 +372,7 @@ def get_text(lessonId: int, request: Request):
 
 @app.get("/lessons-list")
 def create_item(request: Request):
-    userId= get_current_student(request)
+    userId = get_current_student(request)
     if not isinstance(userId, JSONResponse):
         lesson_list = get_lessons_by_studentId(userId)
         return lesson_list
