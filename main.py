@@ -73,8 +73,8 @@ def get_current_student(request: Request):
 
 @app.get("/auth/me")
 def auth(userID: UserID = Depends(get_current_user)):
-    if userID is None:
-        return False
+    if isinstance(userID[0], JSONResponse):
+        return userID[0]
     inf_user = get_user_by_id(userID[0], userID[1])
     if userID[1] == 'student':
         return {"id": inf_user[0], "username": inf_user[4], "avatar": inf_user[3], "role": userID[1]}
@@ -94,10 +94,10 @@ def authentication(login: Login):
 
     if role == "teacher":
         response = JSONResponse(content={"id": client[0], "username": client[3], "avatar": client[2], "role": role})
-        response.set_cookie(key="session", value=session_id)
+        response.set_cookie(key="session", value=session_id, samesite="None")
     elif role == "student":
         response = JSONResponse(content={"id": client[0], "username": client[4], "avatar": client[3], "role": role})
-        response.set_cookie(key="session", value=session_id)
+        response.set_cookie(key="session", value=session_id, samesite="None")
     save_session_data()
     return response
 
