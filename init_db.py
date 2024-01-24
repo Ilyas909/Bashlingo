@@ -74,15 +74,26 @@ def sqlite_db():
                     ''')
 
     cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS lesson_text (
+                    CREATE TABLE IF NOT EXISTS lesson_poem (
                         id INTEGER PRIMARY KEY,
                         lesson_id INTEGER,
-                        line TEXT,
-                        type_text TEXT,
+                        double_line TEXT,
                         audioURL TEXT,
                         FOREIGN KEY (lesson_id) REFERENCES lessons_list(id)
                     )
                     ''')
+
+    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS lesson_text (
+                            id INTEGER PRIMARY KEY,
+                            lesson_id INTEGER,
+                            line TEXT,
+                            startTime FLOAT,
+                            endTime FLOAT,
+                            audioURL TEXT,
+                            FOREIGN KEY (lesson_id) REFERENCES lessons_list(id)
+                        )
+                        ''')
 
     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS solving_result (
@@ -91,9 +102,21 @@ def sqlite_db():
                             student_id INTEGER
                             job_type TEXT,
                             date_solving TEXT,
+                            correspondenceResult INTEGER,
+                            sentenceResult INTEGER,
+                            speakingResult INTEGER,
                             results BOOLEAN,
                             FOREIGN KEY (lesson_id) REFERENCES lessons_list(id)
                             FOREIGN KEY (student_id) REFERENCES student(id)
+                        )
+                        ''')
+
+    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS words_data (
+                            word TEXT PRIMARY KEY,
+                            audio TEXT,
+                            image TEXT,
+                            status INTEGER
                         )
                         ''')
     # Фиксация изменений и закрытие соединения

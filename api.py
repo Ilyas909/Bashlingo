@@ -2,12 +2,17 @@ from pydantic import BaseModel
 from typing import Optional
 
 class Login(BaseModel):
-    username: str
+    username: Optional[str] = None
+    email: Optional[str] = None
     password: str
 
 
 class UserID(BaseModel):
     id: int
+
+
+class User(BaseModel):
+    username: str
 
 
 class ClassID(BaseModel):
@@ -33,6 +38,11 @@ class EntityId(BaseModel):
     id: int
 
 
+class Entityt(BaseModel):
+    lessonId: int
+    available: bool
+
+
 class GetWords(BaseModel):
     theme: str
     existingWords: Optional[str] = None
@@ -41,4 +51,6 @@ class GetWords(BaseModel):
     poem: Optional[str] = None
     reading: Optional[str] = None
     classId: Optional[int] = None
+    lessonId: Optional[int] = None
     date: Optional[str] = None
+    enabledTasks: Optional[list] = None
