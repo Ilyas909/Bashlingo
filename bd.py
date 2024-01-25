@@ -1,7 +1,12 @@
+import os
 import sqlite3
 import random
+from pydub import AudioSegment
 from datetime import datetime
 
+from pydub.silence import split_on_silence
+
+from nail_tts import main
 from starlette.responses import JSONResponse
 
 from api import Login, UserID, NewClass, ClassID, NewName, NewNameStudent, EntityId, GetWords, Entityt, User
@@ -126,7 +131,7 @@ def add_new_studentdb(new_class: NewClass, class_id):
         return False
 
 
-def get_class_info_by_id(class_id: ClassID):
+def get_class_info_by_id(class_id: EntityId):
     conn = sqlite3.connect('text.db')
     cursor = conn.cursor()
     class_info = cursor.execute('SELECT id, title FROM class_list WHERE id = ?;', (class_id.id,)).fetchone()
@@ -219,6 +224,16 @@ def text_to_audio(line: str):
     return f"{name}.mp3", endTime
 
 
+
+def convert_wav_to_mp3(input_file, url):
+    sound = AudioSegment.from_wav(f"{url}/{input_file}")
+    output_file = os.path.splitext(input_file)[0] + ".mp3"
+    sound.export(f"{url}/{output_file}", format="mp3")
+    os.remove(f"{url}/{input_file}")
+    return output_file
+
+
+
 def add_lesson(new_lesson: GetWords):
     conn = sqlite3.connect('text.db')
     cursor = conn.cursor()
@@ -226,7 +241,6 @@ def add_lesson(new_lesson: GetWords):
         date = "2023-04-19T15:00:00Z"
         correspondence, sentence, speaking = 0, 0, 0
         for i in range(len(new_lesson.enabledTasks)):
-            print(new_lesson.enabledTasks[i]['type'])
             if new_lesson.enabledTasks[i]['type'] == 'correspondence':
                 correspondence = new_lesson.enabledTasks[i]['maxScore']
             elif new_lesson.enabledTasks[i]["type"] == 'sentence':
@@ -242,11 +256,22 @@ def add_lesson(new_lesson: GetWords):
         conn.commit()
 
         if len(new_lesson.words) != 0:
+            url = 'static/audio_word'
             words = new_lesson.words.split(', ')
             for word in words:
                 cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);', (new_lesson_id, word))
+                conn.commit()
                 cursor.execute('INSERT OR IGNORE INTO words_data (word, status) VALUES (?, ?);', (word.lower(), 0))
+                if cursor.rowcount > 0:
+                    audio_url = main(word.lower(), url, word.lower())
+                    audio_url = convert_wav_to_mp3(audio_url, url)
+                    cursor.execute('UPDATE words_data SET audio = ? WHERE word = ?;',
+                           (audio_url, word.lower()))
+
             conn.commit()
+
+
+
 
 
         if len(new_lesson.sentences) != 0:
@@ -257,26 +282,46 @@ def add_lesson(new_lesson: GetWords):
             conn.commit()
 
         if new_lesson.poem:
+            url = 'static/audio_poem'
             poem = new_lesson.poem.split('\n')
             for i in range(0, len(poem), 2):
-                audioURL = poem[i] + '.mp3'
                 double_line = poem[i] + '\n' + poem[i+1]
                 cursor.execute(
-                    'INSERT INTO lesson_poem (lesson_id, double_line, audioURL) VALUES (?, ?, ?);',
-                    (new_lesson_id, double_line, audioURL))
+                    'INSERT INTO lesson_poem (lesson_id, double_line) VALUES (?, ?);',
+                    (new_lesson_id, double_line))
+                lesson_id = cursor.lastrowid
+                double_line = double_line.split('\n')
+                audio0 = main(double_line[0], url, f"{lesson_id}0v")
+                audio1 = main(double_line[1], url, f"{lesson_id}1v")
+                audioURL1 = convert_wav_to_mp3(audio0, url)
+                audioURL2 = convert_wav_to_mp3(audio1, url)
+                output_file = f"{lesson_id}.mp3"
+                concatenate_audio_with_pause([f'static/audio_poem/{audioURL1}', f'static/audio_poem/{audioURL2}'], f'static/audio_poem/{output_file}')
+                os.remove(f'static/audio_poem/{audioURL1}')
+                os.remove(f'static/audio_poem/{audioURL2}')
+
+                cursor.execute('UPDATE lesson_poem SET audioURL = ? WHERE id = ?;',
+                               (output_file, lesson_id))
             conn.commit()
 
         if new_lesson.reading:
+            url = 'static/audio_text'
             reading = new_lesson.reading.split('.')
-            time = 0
+            startTime = 0
             for line in reading:
-                audioURL, lenTime = text_to_audio(line)
-                startTime = time
-                endTime = time + lenTime
-                time += lenTime + 0.1
-                cursor.execute(
-                    'INSERT INTO lesson_text (lesson_id, line, startTime, endTime, audioURL) VALUES (?, ?, ?, ?, ?);',
-                    (new_lesson_id, line, startTime, endTime, audioURL))
+                if contains_letters_or_digits(line):
+                    cursor.execute(
+                        'INSERT INTO lesson_text (lesson_id, line) VALUES (?, ?);',
+                        (new_lesson_id, line))
+                    lesson_id = cursor.lastrowid
+                    audioURL = main(line, url, lesson_id)
+                    audioURL = convert_wav_to_mp3(audioURL, url)
+                    endTime = startTime + get_audio_length(f'{url}/{audioURL}')
+                    cursor.execute('UPDATE lesson_text SET startTime = ?, endTime = ?, audioURL = ? WHERE id = ?;',
+                                   (startTime, endTime, audioURL, lesson_id))
+                    startTime = endTime + 0.2
+                else:
+                    continue
             conn.commit()
 
         cursor.close()
@@ -289,6 +334,16 @@ def add_lesson(new_lesson: GetWords):
         cursor.close()
         conn.close()
         return False
+
+
+def contains_letters_or_digits(s):
+    return any(c.isalnum() for c in s)
+
+
+def get_audio_length(file_path):
+    audio = AudioSegment.from_file(file_path)
+    duration_in_seconds = len(audio) / 1000.0  # преобразование миллисекунд в секунды
+    return duration_in_seconds
 
 
 def get_lessons_by_studentId(studentId):
@@ -504,10 +559,16 @@ def get_poem_audio(lessonId: int):
     try:
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
-        result = cursor.execute('SELECT double_line, audioURL FROM lesson_poem WHERE lesson_id = ?;', (lessonId,)).fetchall()
+        result = cursor.execute('SELECT double_line, audioURL, id FROM lesson_poem WHERE lesson_id = ?;', (lessonId,)).fetchall()
         cursor.close()
         conn.close()
-        big_audio = ''.join(audio[1] for audio in result)
+
+        files = []
+        for res in result:
+            files.append(f"static/audio_poem/{res[1]}")
+        output_file = f'{lessonId}.mp3'
+        concatenate_audio_with_pause(files, f"static/audio_big_poem/{output_file}")
+        big_audio = f"static/audio_big_poem/{output_file}"
 
         if result:
             return [
@@ -515,7 +576,7 @@ def get_poem_audio(lessonId: int):
                         "audio": big_audio,
                         "parts": [
                           {
-                            "smallAudio": line[1],
+                            "smallAudio": f"static/audio/poem/{line[1]}",
                             "rowOne": line[0].split('\n')[0],
                             "rowTwo": line[0].split('\n')[1]
                           } for line in result
@@ -527,15 +588,44 @@ def get_poem_audio(lessonId: int):
         return JSONResponse(status_code=500, content={"message":'поиск не удался'})
 
 
+def concatenate_audio_with_pause(files, output_file, pause_duration=400):
+    # Создаем объект AudioSegment для паузы
+    pause = AudioSegment.silent(duration=pause_duration)
+
+    # Список для хранения аудиосегментов
+    segments = []
+
+    # Загружаем каждый аудиофайл и добавляем его в список
+    for file in files:
+        segment = AudioSegment.from_file(file)
+        segments.append(segment)
+        segments.append(pause)  # Добавляем паузу после каждого аудиофайла
+
+    # Убираем последнюю паузу
+    segments.pop()
+
+    # Объединяем все аудиосегменты
+    result = AudioSegment.empty()
+    for segment in segments:
+        result += segment
+
+    result.export(output_file, format="mp3")
+
+
 def get_text_audio(lessonId: int):
     try:
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
-        result = cursor.execute('SELECT line, startTime, endTime, audioURL FROM lesson_text WHERE lesson_id = ?;', (lessonId,)).fetchall()
+        result = cursor.execute('SELECT line, startTime, endTime, audioURL, id FROM lesson_text WHERE lesson_id = ?;', (lessonId,)).fetchall()
         cursor.close()
         conn.close()
+        files = []
+        for res in result:
+            files.append(f"static/audio_text/{res[3]}")
+        output_file = f'{lessonId}.mp3'
+        concatenate_audio_with_pause(files, f"static/audio_big_text/{output_file}")
         title = result[0][0]
-        big_audio = ''.join(audio[3] for audio in result)
+        big_audio = f"static/audio_big_text/{output_file}"
 
         if result:
             return {
@@ -555,6 +645,7 @@ def get_text_audio(lessonId: int):
                     }
         return []
     except sqlite3.Error as e:
+        print(e)
         return JSONResponse(status_code=500, content={"message": 'поиск не удался'})
 
 
@@ -635,3 +726,23 @@ def edit_lesson_lessonId(new_lesson: GetWords):
         cursor.close()
         conn.close()
         return False
+
+
+def check_image(words):
+    conn = sqlite3.connect('text.db')
+    cursor = conn.cursor()
+    sql_query = '''
+        SELECT word
+        FROM words_data
+        WHERE word IN ({})
+        AND image IS NULL;
+    '''.format(', '.join(['?'] * len(words)))
+
+    # Выполняем запрос
+    cursor.execute(sql_query, words)
+
+    # Получаем результат
+    result = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return result

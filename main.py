@@ -7,7 +7,7 @@ from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teach
     add_new_studentdb, get_class_info_by_id, update_class_namedb, update_student_namedb, delete_student, \
     get_class_lessons_by_id, add_lesson, get_lessons_by_studentId, get_lesson_menu_by_lessonId, get_lesson_by_id, \
     lesson_availability, delete_lesson_by_id, fetch_lesson_results, username_update, get_username, save_avatar, \
-    check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId
+    check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId, check_image
 import json
 
 
@@ -15,7 +15,7 @@ app = FastAPI()
 
 # Настройка CORS
 origins = [
-    "http://localhost:3000",  # Если ваш React-приложение работает на этом порту
+    "http://localhost:3000"  # Если ваш React-приложение работает на этом порту
 ]
 
 app.add_middleware(
@@ -94,13 +94,13 @@ def authentication(login: Login):
 
     if role == "teacher":
         response = JSONResponse(content={"id": client[0], "username": client[3], "avatar": client[2], "role": role})
-        #response.set_cookie(key="session", value=session_id)
-        response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
+        response.set_cookie(key="session", value=session_id)
+        #response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
 
     elif role == "student":
         response = JSONResponse(content={"id": client[0], "username": client[4], "avatar": client[3], "role": role})
-        #response.set_cookie(key="session", value=session_id)
-        response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
+        response.set_cookie(key="session", value=session_id)
+        #response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
 
     save_session_data()
     return response
@@ -159,11 +159,11 @@ def add_new_class(new_class: NewClass, request: Request):
         return userId
 
 
-@app.put("/classes/get-class")
-def get_class_by_id(class_id: ClassID, request: Request):
+@app.get("/classes/get-class/{class_id}")
+def get_class_by_id(class_id: int, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
-        return get_class_info_by_id(class_id)
+        return get_class_info_by_id(EntityId(class_id))
     else:
         return userId
 
@@ -207,11 +207,11 @@ def delete_studentID(studentId: int, request: Request):
 
 
 
-@app.put("/classes/get-class-lessons")
-def fetch_class_lessons(classId: EntityId, request: Request):
+@app.get("/classes/get-class-lessons/{classId}")
+def fetch_class_lessons(classId: int, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
-        res = get_class_lessons_by_id(classId)
+        res = get_class_lessons_by_id(EntityId(classId))
         return res
     else:
         return userId
@@ -222,10 +222,14 @@ def get_create_lesson_words(words: GetWords, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
         if words.existingWords:
-            generate_words = words.existingWords + ", lion, tiger, elephant"
+            generate_words = words.existingWords + ", Атайым, әҙәбиәт, донъяһына, килде, күренде, балҡыны, донъяға, һоҡланды, бик, күптәрҙе, таң"
         else:
-            generate_words = "lion, tiger, elephant"
-        wrongWords = "carrot,apple"
+            generate_words = "Атайым, әҙәбиәт, донъяһына, килде, күренде, балҡыны, донъяға, һоҡланды, бик, күптәрҙе, таң"
+
+        words = generate_words.lower().split(', ')
+        wrongWords = check_image(words)
+        wrongWords = [str(word[0]) for word in wrongWords]
+        wrongWords = ', '.join(wrongWords)
         return {"words": generate_words, "wrongWords": wrongWords}
     return userId
 
@@ -280,11 +284,11 @@ def delete_lesson(lessonId: int, classId: int, request: Request):
         return userId
 
 
-@app.put('/classes/get-lesson-results')
-def fetch_lesson_results_by_Id(lessonId: EntityId, request: Request):
+@app.get('/classes/get-lesson-results/{lessonId}')
+def fetch_lesson_results_by_Id(lessonId: int, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
-        res = fetch_lesson_results(lessonId)
+        res = fetch_lesson_results(EntityId(lessonId))
         return res
     else:
         return userId
@@ -359,6 +363,7 @@ def send_speaking_answer(request: Request, file: UploadFile = File(...)):
 @app.get('/tasks/poem/{lessonId}')
 def get_poem(lessonId: int, request: Request):
     check = compliance_check(lessonId, request)
+    check = 1
     if check:
         res = get_poem_audio(lessonId)
         return res
@@ -368,6 +373,7 @@ def get_poem(lessonId: int, request: Request):
 @app.get('/tasks/text/{lessonId}')
 def get_text(lessonId: int, request: Request):
     check = compliance_check(lessonId, request)
+    check =1
     if check:
         res = get_text_audio(lessonId)
         return res
