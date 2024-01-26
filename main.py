@@ -1,17 +1,22 @@
-from fastapi import FastAPI, Cookie, Depends, UploadFile, File
+from json import JSONDecodeError
+
+from fastapi import FastAPI, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request
-from api import Login, UserID, NewClass, ClassID, NewName, NewNameStudent, EntityId, GetWords, Entityt, User
+from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User
 from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teacherID, add_new_classdb, \
     add_new_studentdb, get_class_info_by_id, update_class_namedb, update_student_namedb, delete_student, \
     get_class_lessons_by_id, add_lesson, get_lessons_by_studentId, get_lesson_menu_by_lessonId, get_lesson_by_id, \
     lesson_availability, delete_lesson_by_id, fetch_lesson_results, username_update, get_username, save_avatar, \
     check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId, check_image
 import json
+from fastapi.staticfiles import StaticFiles
 
 
 app = FastAPI()
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Настройка CORS
 origins = [
@@ -27,6 +32,16 @@ app.add_middleware(
 )
 
 
+try:
+    with open("config.json", "r") as file:
+        inf = json.load(file)
+        url_server = inf["url_server"]
+        user_is_secure = inf["user_is_secure"]
+except (FileNotFoundError, json.decoder.JSONDecodeError):
+    raise JSONDecodeError("config.json not found")
+
+
+
 session_storage = {}
 
 # Имя файла, в котором будем сохранять информацию о сессиях
@@ -39,10 +54,12 @@ try:
 except (FileNotFoundError, json.decoder.JSONDecodeError):
     session_storage = {}
 
+
 def save_session_data():
     # Сохранение информации о сессиях в файл
     with open(SESSION_FILE, "w") as file:
         json.dump(session_storage, file)
+
 
 def get_current_user(request: Request):
     cookie_session = request.cookies.get("session")
@@ -70,7 +87,6 @@ def get_current_student(request: Request):
         return JSONResponse(status_code=404, content={"message": "not found"})
 
 
-
 @app.get("/auth/me")
 def auth(userID: UserID = Depends(get_current_user)):
     if isinstance(userID[0], JSONResponse):
@@ -84,7 +100,7 @@ def auth(userID: UserID = Depends(get_current_user)):
 
 @app.post("/auth/login")
 def authentication(login: Login):
-    login.username=login.email
+    login.username = login.email
     client, role = user_exists_by_credentials(login)
     if not client:
         return JSONResponse(status_code=404, content={"message": "not found"})
@@ -94,14 +110,17 @@ def authentication(login: Login):
 
     if role == "teacher":
         response = JSONResponse(content={"id": client[0], "username": client[3], "avatar": client[2], "role": role})
-        response.set_cookie(key="session", value=session_id)
-        #response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
+        if user_is_secure:
+            response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
+        else:
+            response.set_cookie(key="session", value=session_id)
 
     elif role == "student":
         response = JSONResponse(content={"id": client[0], "username": client[4], "avatar": client[3], "role": role})
-        response.set_cookie(key="session", value=session_id)
-        #response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
-
+        if user_is_secure:
+            response.set_cookie(key="session", value=session_id, httponly=True, samesite="None", secure=True)
+        else:
+            response.set_cookie(key="session", value=session_id)
     save_session_data()
     return response
 
@@ -117,7 +136,6 @@ def user_logout(request: Request):
 
         with open(SESSION_FILE, 'w') as file:
             json.dump(session_storage, file, indent=2)
-
 
 
 @app.post("/user")
@@ -140,11 +158,12 @@ def get_classes_list(request: Request):
     else:
         return userId
 
+
 @app.put("/classes/add-class")
 def add_new_class(new_class: NewClass, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
-        new_class.studentsList = new_class.studentsList.split(',')
+        new_class.studentsList = new_class.studentsList.split(', ')
         id_add_class = add_new_classdb(new_class, userId)
         if id_add_class:
             add_student = add_new_studentdb(new_class, id_add_class)
@@ -163,7 +182,7 @@ def add_new_class(new_class: NewClass, request: Request):
 def get_class_by_id(class_id: int, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
-        return get_class_info_by_id(EntityId(class_id))
+        return get_class_info_by_id(EntityId(id=class_id))
     else:
         return userId
 
@@ -180,8 +199,6 @@ def update_class_name(classId: int, new_name: NewName, request: Request):
         return userId
 
 
-
-
 @app.put("/classes/update-student-name")
 def update_student_name(new_name_student: NewNameStudent, request: Request):
     userId = get_current_teacher(request)
@@ -190,7 +207,6 @@ def update_student_name(new_name_student: NewNameStudent, request: Request):
         return res
     else:
         return userId
-
 
 
 @app.delete("/classes/delete-student/{studentId}")
@@ -205,13 +221,11 @@ def delete_studentID(studentId: int, request: Request):
         return userId
 
 
-
-
 @app.get("/classes/get-class-lessons/{classId}")
 def fetch_class_lessons(classId: int, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
-        res = get_class_lessons_by_id(EntityId(classId))
+        res = get_class_lessons_by_id(EntityId(id=classId))
         return res
     else:
         return userId
@@ -288,7 +302,7 @@ def delete_lesson(lessonId: int, classId: int, request: Request):
 def fetch_lesson_results_by_Id(lessonId: int, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
-        res = fetch_lesson_results(EntityId(lessonId))
+        res = fetch_lesson_results(EntityId(id=lessonId))
         return res
     else:
         return userId
@@ -304,7 +318,6 @@ def edit_lesson(edit: GetWords, request: Request):
         return JSONResponse(status_code=200, content={"message": "Урок изменен"})
     else:
         return userId
-
 
 
 @app.put('/user/username')
@@ -373,7 +386,7 @@ def get_poem(lessonId: int, request: Request):
 @app.get('/tasks/text/{lessonId}')
 def get_text(lessonId: int, request: Request):
     check = compliance_check(lessonId, request)
-    check =1
+    check = 1
     if check:
         res = get_text_audio(lessonId)
         return res

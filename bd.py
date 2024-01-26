@@ -1,15 +1,31 @@
+import json
 import os
 import sqlite3
 import random
+from json import JSONDecodeError
+
+from fastapi import FastAPI
 from pydub import AudioSegment
 from datetime import datetime
 
 from pydub.silence import split_on_silence
+from starlette.staticfiles import StaticFiles
 
 from nail_tts import main
 from starlette.responses import JSONResponse
 
 from api import Login, UserID, NewClass, ClassID, NewName, NewNameStudent, EntityId, GetWords, Entityt, User
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+try:
+    with open("config.json", "r") as file:
+        inf = json.load(file)
+        url_server = inf["url_server"]
+        user_is_secure = inf["user_is_secure"]
+except (FileNotFoundError, json.decoder.JSONDecodeError):
+    raise JSONDecodeError("config.json not found")
 
 
 def user_exists_by_credentials(log: Login):
@@ -238,7 +254,6 @@ def add_lesson(new_lesson: GetWords):
     conn = sqlite3.connect('text.db')
     cursor = conn.cursor()
     try:
-        date = "2023-04-19T15:00:00Z"
         correspondence, sentence, speaking = 0, 0, 0
         for i in range(len(new_lesson.enabledTasks)):
             if new_lesson.enabledTasks[i]['type'] == 'correspondence':
@@ -549,7 +564,7 @@ def image_words(lessonId: int):
         cursor.close()
         conn.close()
         if result:
-            return [{"id": res[0], "word": res[1], "image": res[2]} for res in result]
+            return [{"id": res[0], "word": res[1], "image": url_server + res[2]} for res in result]
         return []
     except sqlite3.Error as e:
         return JSONResponse(status_code=500, content={"message":'поиск не удался'})

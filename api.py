@@ -37,8 +37,6 @@ class NewNameStudent(BaseModel):
 class EntityId(BaseModel):
     id: int
 
-    def __init__(self,id):
-        self.id =id
 
 
 class Entityt(BaseModel):
