@@ -292,7 +292,8 @@ def add_lesson(new_lesson: GetWords):
         if len(new_lesson.sentences) != 0:
             sentences = new_lesson.sentences.split('.')
             for word in sentences:
-                cursor.execute(
+                if contains_letters_or_digits(word):
+                    cursor.execute(
                     'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);', (new_lesson_id, word))
             conn.commit()
 
@@ -349,6 +350,8 @@ def add_lesson(new_lesson: GetWords):
         cursor.close()
         conn.close()
         return False
+
+
 
 
 def contains_letters_or_digits(s):
@@ -567,7 +570,35 @@ def image_words(lessonId: int):
             return [{"id": res[0], "word": res[1], "image": url_server + res[2]} for res in result]
         return []
     except sqlite3.Error as e:
-        return JSONResponse(status_code=500, content={"message":'поиск не удался'})
+        return JSONResponse(status_code=404, content={"message":'поиск не удался'})
+
+
+def get_sentence(lessonId: int):
+    try:
+        conn = sqlite3.connect('text.db')
+        cursor = conn.cursor()
+        result = cursor.execute('SELECT id, sentences FROM lesson_sentences WHERE lesson_id = ?;', (lessonId,)).fetchall()
+        cursor.close()
+        conn.close()
+        if result:
+            return [{"id": res[0], "sentence": res[1]} for res in result]
+        return []
+    except sqlite3.Error as e:
+        return JSONResponse(status_code=404, content={"message":'поиск не удался'})
+
+
+def get_speaking(lessonId: int):
+    try:
+        conn = sqlite3.connect('text.db')
+        cursor = conn.cursor()
+        result = cursor.execute('SELECT id, word FROM lesson_word WHERE lesson_id = ?;', (lessonId,)).fetchall()
+        cursor.close()
+        conn.close()
+        if result:
+            return [{"id": res[0], "text": res[1]} for res in result]
+        return []
+    except sqlite3.Error as e:
+        return JSONResponse(status_code=404, content={"message":'поиск не удался'})
 
 
 def get_poem_audio(lessonId: int):

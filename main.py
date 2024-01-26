@@ -9,7 +9,8 @@ from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teach
     add_new_studentdb, get_class_info_by_id, update_class_namedb, update_student_namedb, delete_student, \
     get_class_lessons_by_id, add_lesson, get_lessons_by_studentId, get_lesson_menu_by_lessonId, get_lesson_by_id, \
     lesson_availability, delete_lesson_by_id, fetch_lesson_results, username_update, get_username, save_avatar, \
-    check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId, check_image
+    check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId, check_image, get_sentence, \
+    get_speaking
 import json
 from fastapi.staticfiles import StaticFiles
 
@@ -358,6 +359,26 @@ def get_correspondence_tasks(lessonId: int, request: Request):
         res = image_words(lessonId)
         return res
     return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
+
+
+@app.get('/tasks/sentence/{lessonId}')
+def get_sentence_tasks(lessonId: int, request: Request):
+    check = compliance_check(lessonId, request)
+    if check:
+        res = get_sentence(lessonId)
+        return res
+    return JSONResponse(status_code=404, content={"message": 'пользователь не авторизован'})
+
+
+@app.get('/tasks/speaking/{lessonId}')
+def get_speaking_tasks(lessonId: int, request: Request):
+    check = compliance_check(lessonId, request)
+    if check:
+        res = get_speaking(lessonId)
+        return res
+    return JSONResponse(status_code=404, content={"message": 'пользователь не авторизован'})
+
+
 
 
 @app.post('/tasks/speaking')
