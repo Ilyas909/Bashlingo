@@ -4,6 +4,7 @@ import sqlite3
 def sqlite_db():
     # Подключение к базе данных (если базы данных нет, она будет создана)
     conn = sqlite3.connect('text.db')
+    conn.execute('PRAGMA foreign_keys = ON;')
     cursor = conn.cursor()
 
     # Создание таблицы, если она еще не существует
@@ -60,7 +61,7 @@ def sqlite_db():
                     id INTEGER PRIMARY KEY,
                     lesson_id INTEGER,
                     word TEXT,
-                    FOREIGN KEY (lesson_id) REFERENCES lessons_list(id)
+                    FOREIGN KEY (lesson_id) REFERENCES lessons_list(id) ON DELETE CASCADE
                 )
                 ''')
 
@@ -69,7 +70,7 @@ def sqlite_db():
                         id INTEGER PRIMARY KEY,
                         lesson_id INTEGER,
                         sentences TEXT,
-                        FOREIGN KEY (lesson_id) REFERENCES lessons_list(id)
+                        FOREIGN KEY (lesson_id) REFERENCES lessons_list(id) ON DELETE CASCADE
                     )
                     ''')
 
@@ -79,7 +80,7 @@ def sqlite_db():
                         lesson_id INTEGER,
                         double_line TEXT,
                         audioURL TEXT,
-                        FOREIGN KEY (lesson_id) REFERENCES lessons_list(id)
+                        FOREIGN KEY (lesson_id) REFERENCES lessons_list(id) ON DELETE CASCADE
                     )
                     ''')
 
@@ -91,7 +92,7 @@ def sqlite_db():
                             startTime FLOAT,
                             endTime FLOAT,
                             audioURL TEXT,
-                            FOREIGN KEY (lesson_id) REFERENCES lessons_list(id)
+                            FOREIGN KEY (lesson_id) REFERENCES lessons_list(id) ON DELETE CASCADE
                         )
                         ''')
 

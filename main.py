@@ -1,10 +1,12 @@
+import os
 from json import JSONDecodeError
-
+import shutil
 from fastapi import FastAPI, Depends, UploadFile, File
+from fastapi import Form
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request
-from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User
+from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, AudioFile
 from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teacherID, add_new_classdb, \
     add_new_studentdb, get_class_info_by_id, update_class_namedb, update_student_namedb, delete_student, \
     get_class_lessons_by_id, add_lesson, get_lessons_by_studentId, get_lesson_menu_by_lessonId, get_lesson_by_id, \
@@ -13,7 +15,8 @@ from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teach
     get_speaking
 import json
 from fastapi.staticfiles import StaticFiles
-
+from email import message_from_bytes
+from email.policy import HTTP
 
 app = FastAPI()
 
@@ -382,16 +385,18 @@ def get_speaking_tasks(lessonId: int, request: Request):
 
 
 @app.post('/tasks/speaking')
-def send_speaking_answer(request: Request, file: UploadFile = File(...)):
+async def send_speaking_answer(request: Request, correct_text: str = Form(...),
+    audio: UploadFile = File(...)):
     userId = get_current_student(request)
     if not isinstance(userId, JSONResponse):
-        username = get_username(userId)
-        file_path = f"static/speaking_answer/{username}.mp3"
-        with open(file_path, "wb") as f:
-            f.write(file.file.read())
-        return {"result": "OK"}
-    else:
-        return {"result": "BAD"}
+        # Получение значений
+        audio_data = audio.file.read()
+        # Сохранение файла на сервере
+        file_location = f"./static/audio_word_task/{correct_text}.wav"
+        with open(file_location, "wb") as file:
+            file.write(audio_data)
+
+    return {"result": "OK"}
 
 
 @app.get('/tasks/poem/{lessonId}')

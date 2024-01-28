@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
+from fastapi import UploadFile, File
+
 
 class Login(BaseModel):
     username: Optional[str] = None
@@ -42,6 +44,11 @@ class EntityId(BaseModel):
 class Entityt(BaseModel):
     lessonId: int
     available: bool
+
+
+class AudioFile(BaseModel):
+    correct_text: str
+    audio: UploadFile = File(...)
 
 
 class GetWords(BaseModel):
