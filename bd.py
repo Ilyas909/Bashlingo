@@ -315,13 +315,13 @@ def add_lesson(new_lesson: GetWords):
 
         if new_lesson.reading:
             url = 'static/audio_text'
-            reading = new_lesson.reading.split('.')
+            reading = new_lesson.reading.split('. ')
             startTime = 0
             for line in reading:
                 if contains_letters_or_digits(line):
                     cursor.execute(
                         'INSERT INTO lesson_text (lesson_id, line) VALUES (?, ?);',
-                        (new_lesson_id, line))
+                        (new_lesson_id, line+'.'))
                     lesson_id = cursor.lastrowid
                     audioURL = main(line, url, lesson_id)
                     audioURL = convert_wav_to_mp3(audioURL, url)
@@ -382,7 +382,9 @@ def get_lesson_menu_by_lessonId(lessonId: int):
         words_to_add = [
             "Nouns" if lesson_menu[3] > 0 else "",
             "Pronouns" if lesson_menu[4] > 0 else "",
-            "Verbs" if lesson_menu[5] > 0 else ""
+            "Verbs" if lesson_menu[5] > 0 else "",
+            "Poem" if lesson_menu[6] else "",
+            "Read" if lesson_menu[7] else ""
         ]
         # Отфильтруем только непустые значения
         words_to_add = list(filter(lambda word: word != "", words_to_add))
@@ -589,7 +591,7 @@ def image_words(lessonId: int):
         cursor.close()
         conn.close()
         if result:
-            return [{"id": res[0], "word": res[1], "image": url_server + res[2]} for res in result]
+            return [{"id": res[0], "word": res[1], "image": f"{url_server}/static/image_word/{res[2]}"} for res in result]
         return []
     except sqlite3.Error as e:
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
@@ -638,7 +640,7 @@ def get_poem_audio(lessonId: int):
             files.append(f"static/audio_poem/{res[1]}")
         output_file = f'{lessonId}.mp3'
         concatenate_audio_with_pause(files, f"static/audio_big_poem/{output_file}")
-        big_audio = f"static/audio_big_poem/{output_file}"
+        big_audio = f"{url_server}/static/audio_big_poem/{output_file}"
 
         if result:
             return [
@@ -646,7 +648,7 @@ def get_poem_audio(lessonId: int):
                     "audio": big_audio,
                     "parts": [
                         {
-                            "smallAudio": f"static/audio/poem/{line[1]}",
+                            "smallAudio": f"{url_server}/static/audio_poem/{line[1]}",
                             "rowOne": line[0].split('\n')[0],
                             "rowTwo": line[0].split('\n')[1]
                         } for line in result
@@ -696,7 +698,7 @@ def get_text_audio(lessonId: int):
         output_file = f'{lessonId}.mp3'
         concatenate_audio_with_pause(files, f"static/audio_big_text/{output_file}")
         title = result[0][0]
-        big_audio = f"static/audio_big_text/{output_file}"
+        big_audio = f"{url_server}/static/audio_big_text/{output_file}"
 
         if result:
             return {
@@ -800,7 +802,7 @@ def edit_lesson_lessonId(new_lesson: GetWords):
                 if contains_letters_or_digits(line):
                     cursor.execute(
                         'INSERT INTO lesson_text (lesson_id, line) VALUES (?, ?);',
-                        (new_lesson.lessonId, line))
+                        (new_lesson.lessonId, line + '.'))
                     lesson_id = cursor.lastrowid
                     audioURL = main(line, url, lesson_id)
                     audioURL = convert_wav_to_mp3(audioURL, url)
