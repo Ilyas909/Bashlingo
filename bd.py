@@ -363,7 +363,7 @@ def get_lessons_by_studentId(studentId):
         classId = int(classId[0])
     else:
         return JSONResponse(status_code=200, content={"message": "Ошибка"})
-    lesson_list = cursor.execute('SELECT * FROM lessons_list WHERE class_id = ?;', (classId,)).fetchall()
+    lesson_list = cursor.execute('SELECT * FROM lessons_list WHERE class_id = ? AND available = true;', (classId,)).fetchall()
     cursor.close()
     conn.close()
     if lesson_list:
