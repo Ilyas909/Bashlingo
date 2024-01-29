@@ -268,6 +268,8 @@ def add_lesson(new_lesson: GetWords):
 
         if len(new_lesson.words) != 0:
             url = 'static/audio_word'
+            if not os.path.exists(f"./{url}"):
+                os.makedirs(f"./{url}")
             words = new_lesson.words.split(', ')
             for word in words:
                 cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);', (new_lesson_id, word))
@@ -291,6 +293,8 @@ def add_lesson(new_lesson: GetWords):
 
         if new_lesson.poem:
             url = 'static/audio_poem'
+            if not os.path.exists(f"./{url}"):
+                os.makedirs(f"./{url}")
             poem = new_lesson.poem.split('\n')
             for i in range(0, len(poem), 2):
                 double_line = poem[i] + '\n' + poem[i + 1]
@@ -315,6 +319,8 @@ def add_lesson(new_lesson: GetWords):
 
         if new_lesson.reading:
             url = 'static/audio_text'
+            if not os.path.exists(f"./{url}"):
+                os.makedirs(f"./{url}")
             reading = new_lesson.reading.split('. ')
             startTime = 0
             for line in reading:
@@ -628,6 +634,8 @@ def get_speaking(lessonId: int):
 
 def get_poem_audio(lessonId: int):
     try:
+        if not os.path.exists(f"./static/audio_big_poem"):
+            os.makedirs(f"./static/audio_big_poem")
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
         result = cursor.execute('SELECT double_line, audioURL, id FROM lesson_poem WHERE lesson_id = ?;',
@@ -686,6 +694,8 @@ def concatenate_audio_with_pause(files, output_file, pause_duration=400):
 
 def get_text_audio(lessonId: int):
     try:
+        if not os.path.exists(f"./static/audio_big_text"):
+            os.makedirs(f"./static/audio_big_text")
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
         result = cursor.execute('SELECT line, startTime, endTime, audioURL, id FROM lesson_text WHERE lesson_id = ?;',
