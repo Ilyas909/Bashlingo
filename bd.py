@@ -674,7 +674,7 @@ def concatenate_audio_with_pause(files, output_file, pause_duration=400):
         segments.append(pause)  # Добавляем паузу после каждого аудиофайла
 
     # Убираем последнюю паузу
-    segments.pop()
+    # segments.pop()
 
     # Объединяем все аудиосегменты
     result = AudioSegment.empty()
