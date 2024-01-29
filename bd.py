@@ -321,7 +321,7 @@ def add_lesson(new_lesson: GetWords):
             url = 'static/audio_text'
             if not os.path.exists(f"./{url}"):
                 os.makedirs(f"./{url}")
-            reading = new_lesson.reading.split('. ')
+            reading = new_lesson.reading.split('.')
             startTime = 0
             for line in reading:
                 if contains_letters_or_digits(line):
