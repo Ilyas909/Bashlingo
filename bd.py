@@ -334,7 +334,7 @@ def add_lesson(new_lesson: GetWords):
                     endTime = startTime + get_audio_length(f'{url}/{audioURL}')
                     cursor.execute('UPDATE lesson_text SET startTime = ?, endTime = ?, audioURL = ? WHERE id = ?;',
                                    (startTime, endTime, audioURL, lesson_id))
-                    startTime = endTime + 0.2
+                    startTime = endTime + 400
                 else:
                     continue
             conn.commit()
@@ -357,7 +357,7 @@ def contains_letters_or_digits(s):
 
 def get_audio_length(file_path):
     audio = AudioSegment.from_file(file_path)
-    duration_in_seconds = len(audio) / 1000.0  # преобразование миллисекунд в секунды
+    duration_in_seconds = len(audio)  # преобразование миллисекунд в секунды
     return duration_in_seconds
 
 
@@ -819,7 +819,7 @@ def edit_lesson_lessonId(new_lesson: GetWords):
                     endTime = startTime + get_audio_length(f'{url}/{audioURL}')
                     cursor.execute('UPDATE lesson_text SET startTime = ?, endTime = ?, audioURL = ? WHERE id = ?;',
                                    (startTime, endTime, audioURL, lesson_id))
-                    startTime = endTime + 0.2
+                    startTime = endTime + 400
                 else:
                     continue
             conn.commit()
