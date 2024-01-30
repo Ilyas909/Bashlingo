@@ -12,7 +12,7 @@ from starlette.staticfiles import StaticFiles
 from nail_tts import main
 from starlette.responses import JSONResponse
 
-from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User
+from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, Result
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -288,14 +288,15 @@ def add_lesson(new_lesson: GetWords):
             for word in sentences:
                 if contains_letters_or_digits(word):
                     cursor.execute(
-                        'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);', (new_lesson_id, word))
+                        'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);', (new_lesson_id, word.strip()))
             conn.commit()
 
         if new_lesson.poem:
             url = 'static/audio_poem'
             if not os.path.exists(f"./{url}"):
                 os.makedirs(f"./{url}")
-            poem = new_lesson.poem.split('\n')
+            poem1 = new_lesson.poem.split('\n')
+            poem = [item for item in poem1 if item.strip() != ""]
             for i in range(0, len(poem), 2):
                 double_line = poem[i] + '\n' + poem[i + 1]
                 cursor.execute(
@@ -315,6 +316,7 @@ def add_lesson(new_lesson: GetWords):
 
                 cursor.execute('UPDATE lesson_poem SET audioURL = ? WHERE id = ?;',
                                (output_file, lesson_id))
+
             conn.commit()
 
         if new_lesson.reading:
@@ -646,30 +648,35 @@ def get_poem_audio(lessonId: int):
         files = []
         for res in result:
             files.append(f"static/audio_poem/{res[1]}")
-        output_file = f'{lessonId}.mp3'
-        concatenate_audio_with_pause(files, f"static/audio_big_poem/{output_file}")
-        big_audio = f"{url_server}/static/audio_big_poem/{output_file}"
+
+        big_audios = []
+        for i in range(0, len(files), 2):
+            output_file = f'{lessonId}l{i}.mp3'
+            concatenate_audio_with_pause([files[i], files[i+1]], f"static/audio_big_poem/{output_file}")
+            big_audios.append(f"{url_server}/static/audio_big_poem/{output_file}")
 
         if result:
+            i = 0
             return [
                 {
                     "audio": big_audio,
                     "parts": [
                         {
-                            "smallAudio": f"{url_server}/static/audio_poem/{line[1]}",
-                            "rowOne": line[0].split('\n')[0],
-                            "rowTwo": line[0].split('\n')[1]
-                        } for line in result
+                            "smallAudio": f"{url_server}/static/audio_poem/{result[k][1]}",
+                            "rowOne": result[k][0].split('\n')[0],
+                            "rowTwo": result[k][0].split('\n')[1]
+                        } for k in range(i*2, i*2+2)
                     ]
-                }
+                }for i, big_audio in enumerate(big_audios)
             ]
+
+
         return []
     except sqlite3.Error as e:
         return JSONResponse(status_code=500, content={"message": 'поиск не удался'})
 
 
 def concatenate_audio_with_pause(files, output_file, pause_duration=400):
-    # Создаем объект AudioSegment для паузы
     pause = AudioSegment.silent(duration=pause_duration)
 
     # Список для хранения аудиосегментов
@@ -775,13 +782,14 @@ def edit_lesson_lessonId(new_lesson: GetWords):
             sentences = new_lesson.sentences.split('.')
             for word in sentences:
                 cursor.execute(
-                    'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);', (new_lesson.lessonId, word))
+                    'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);', (new_lesson.lessonId, word.strip()))
             conn.commit()
 
         cursor.execute('DELETE FROM lesson_poem WHERE lesson_id = ?;', (new_lesson.lessonId,))
         if new_lesson.poem:
             url = 'static/audio_poem'
-            poem = new_lesson.poem.split('\n')
+            poem1 = new_lesson.poem.split('\n')
+            poem = [item for item in poem1 if item.strip() != ""]
             for i in range(0, len(poem), 2):
                 double_line = poem[i] + '\n' + poem[i + 1]
                 cursor.execute(
@@ -854,3 +862,7 @@ def check_image(words):
     cursor.close()
     conn.close()
     return result
+
+
+def task_result_correspondence(result: Result, userId):
+    pass

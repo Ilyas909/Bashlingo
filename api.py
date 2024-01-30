@@ -62,3 +62,8 @@ class GetWords(BaseModel):
     lessonId: Optional[int] = None
     date: Optional[str] = None
     enabledTasks: Optional[list] = None
+
+
+class Result(BaseModel):
+    lessonId: int
+    result: int

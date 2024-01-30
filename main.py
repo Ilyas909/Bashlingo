@@ -6,13 +6,13 @@ from fastapi import Form
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request
-from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, AudioFile
+from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, AudioFile, Result
 from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teacherID, add_new_classdb, \
     add_new_studentdb, get_class_info_by_id, update_class_namedb, update_student_namedb, delete_student, \
     get_class_lessons_by_id, add_lesson, get_lessons_by_studentId, get_lesson_menu_by_lessonId, get_lesson_by_id, \
     lesson_availability, delete_lesson_by_id, fetch_lesson_results, username_update, get_username, save_avatar, \
     check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId, check_image, get_sentence, \
-    get_speaking
+    get_speaking, task_result_correspondence
 import json
 from fastapi.staticfiles import StaticFiles
 from email import message_from_bytes
@@ -435,5 +435,15 @@ def get_lesson_menu(lessonId: int, request: Request):
     if not isinstance(userId, JSONResponse):
         lesson_menu = get_lesson_menu_by_lessonId(lessonId)
         return lesson_menu
+    else:
+        return userId
+
+
+@app.put('/tasks/correspondence/result')
+def result_correspondence(result: Result, request: Request):
+    userId = get_current_student(request)
+    if not isinstance(userId, JSONResponse):
+        res = task_result_correspondence(result, userId)
+        return res
     else:
         return userId
