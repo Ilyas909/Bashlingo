@@ -1,3 +1,5 @@
+import math
+from datetime import datetime, timezone
 import json
 import os
 import sqlite3
@@ -12,7 +14,7 @@ from starlette.staticfiles import StaticFiles
 from nail_tts import main
 from starlette.responses import JSONResponse
 
-from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, Result
+from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, ResultGame
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -272,14 +274,14 @@ def add_lesson(new_lesson: GetWords):
                 os.makedirs(f"./{url}")
             words = new_lesson.words.split(', ')
             for word in words:
-                cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);', (new_lesson_id, word))
+                cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);', (new_lesson_id, word.upper()))
                 conn.commit()
-                cursor.execute('INSERT OR IGNORE INTO words_data (word, status) VALUES (?, ?);', (word.lower(), 0))
+                cursor.execute('INSERT OR IGNORE INTO words_data (word, status) VALUES (?, ?);', (word.upper(), 0))
                 if cursor.rowcount > 0:
-                    audio_url = main(word.lower(), url, word.lower())
+                    audio_url = main(word.lower(), url, word.upper())
                     audio_url = convert_wav_to_mp3(audio_url, url)
                     cursor.execute('UPDATE words_data SET audio = ? WHERE word = ?;',
-                                   (audio_url, word.lower()))
+                                   (audio_url, word.upper()))
 
             conn.commit()
 
@@ -288,7 +290,8 @@ def add_lesson(new_lesson: GetWords):
             for word in sentences:
                 if contains_letters_or_digits(word):
                     cursor.execute(
-                        'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);', (new_lesson_id, word.strip()))
+                        'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);',
+                        (new_lesson_id, word.strip()))
             conn.commit()
 
         if new_lesson.poem:
@@ -329,7 +332,7 @@ def add_lesson(new_lesson: GetWords):
                 if contains_letters_or_digits(line):
                     cursor.execute(
                         'INSERT INTO lesson_text (lesson_id, line) VALUES (?, ?);',
-                        (new_lesson_id, line+'.'))
+                        (new_lesson_id, line + '.'))
                     lesson_id = cursor.lastrowid
                     audioURL = main(line, url, lesson_id)
                     audioURL = convert_wav_to_mp3(audioURL, url)
@@ -371,7 +374,8 @@ def get_lessons_by_studentId(studentId):
         classId = int(classId[0])
     else:
         return JSONResponse(status_code=200, content={"message": "Ошибка"})
-    lesson_list = cursor.execute('SELECT * FROM lessons_list WHERE class_id = ? AND available = true;', (classId,)).fetchall()
+    lesson_list = cursor.execute('SELECT * FROM lessons_list WHERE class_id = ? AND available = true;',
+                                 (classId,)).fetchall()
     cursor.close()
     conn.close()
     if lesson_list:
@@ -405,8 +409,9 @@ def get_lesson_by_id(lessonId: int):
     try:
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
-        title, class_id, date_lesson = cursor.execute('SELECT title, class_id, date_lesson FROM lessons_list WHERE id = ?;',
-                                         (lessonId,)).fetchone()
+        title, class_id, date_lesson = cursor.execute(
+            'SELECT title, class_id, date_lesson FROM lessons_list WHERE id = ?;',
+            (lessonId,)).fetchone()
         words = cursor.execute('SELECT word FROM lesson_word WHERE lesson_id = ?;', (lessonId,)).fetchall()
         sentences = cursor.execute('SELECT sentences FROM lesson_sentences WHERE lesson_id = ?;',
                                    (lessonId,)).fetchall()
@@ -589,30 +594,79 @@ def check_student(userId: int, lessonId: int):
         return False
 
 
-def image_words(lessonId: int):
+def image_words(lessonId: int, userId: int):
     try:
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
+        count_task = cursor.execute('SELECT matching_game FROM lessons_list WHERE id = ?;',
+                                (lessonId,)).fetchone()
         result = cursor.execute(
             'SELECT lw.id, wd.word, wd.image FROM words_data wd JOIN lesson_word lw ON wd.word = lw.word WHERE lw.lesson_id = ? AND wd.status = 1;',
             (lessonId,)).fetchall()
+        right_word = cursor.execute('SELECT item_id FROM solving_result WHERE lesson_id = ? AND student_id = ? AND job_type = "correspondence" AND results = true;',
+                                (lessonId, userId,)).fetchall()
         cursor.close()
         conn.close()
+
+        count_task = count_task[0]
+        result_list = [item[0] for item in right_word]
+        right_word = result_list
+        if count_task > len(result):
+            result *= math.ceil(count_task / len(result))
+            result = result[:count_task]
+
+
+        if right_word:
+            for wordId in result:
+                if right_word:
+                    if list(wordId)[0] in right_word:
+                        result.reverse()
+                        result.remove(wordId)
+                        result.reverse()
+                        right_word.pop(0)
+                else:
+                    break
+
         if result:
-            return [{"id": res[0], "word": res[1], "image": f"{url_server}/static/image_word/{res[2]}"} for res in result]
+            return [{"id": res[0], "word": res[1], "image": f"{url_server}/static/image_word/{res[2]}"} for res in
+                    result]
         return []
     except sqlite3.Error as e:
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
 
 
-def get_sentence(lessonId: int):
+def get_sentence(lessonId: int, userId: int):
     try:
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
+        count_task = cursor.execute('SELECT contents_offer FROM lessons_list WHERE id = ?;',
+                                    (lessonId,)).fetchone()
         result = cursor.execute('SELECT id, sentences FROM lesson_sentences WHERE lesson_id = ?;',
                                 (lessonId,)).fetchall()
+        right_word = cursor.execute(
+            'SELECT item_id FROM solving_result WHERE lesson_id = ? AND student_id = ? AND job_type = "sentence" AND results = true;',
+            (lessonId, userId,)).fetchall()
         cursor.close()
         conn.close()
+
+        count_task = count_task[0]
+        result_list = [item[0] for item in right_word]
+        right_word = result_list
+        if count_task > len(result):
+            result *= math.ceil(count_task / len(result))
+            result = result[:count_task]
+
+        if right_word:
+            for wordId in result:
+                if right_word:
+                    if list(wordId)[0] in right_word:
+                        result.reverse()
+                        result.remove(wordId)
+                        result.reverse()
+                        right_word.pop(0)
+                else:
+                    break
+
         if result:
             return [{"id": res[0], "sentence": res[1]} for res in result]
         return []
@@ -620,13 +674,37 @@ def get_sentence(lessonId: int):
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
 
 
-def get_speaking(lessonId: int):
+def get_speaking(lessonId: int, userId: int):
     try:
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
+        count_task = cursor.execute('SELECT say_the_word FROM lessons_list WHERE id = ?;',
+                                    (lessonId,)).fetchone()
         result = cursor.execute('SELECT id, word FROM lesson_word WHERE lesson_id = ?;', (lessonId,)).fetchall()
+        right_word = cursor.execute(
+            'SELECT item_id FROM solving_result WHERE lesson_id = ? AND student_id = ? AND job_type = "speaking" AND results = true;',
+            (lessonId, userId,)).fetchall()
         cursor.close()
         conn.close()
+
+        count_task = count_task[0]
+        result_list = [item[0] for item in right_word]
+        right_word = result_list
+        if count_task > len(result):
+            result *= math.ceil(count_task / len(result))
+            result = result[:count_task]
+
+        if right_word:
+            for wordId in result:
+                if right_word:
+                    if list(wordId)[0] in right_word:
+                        result.reverse()
+                        result.remove(wordId)
+                        result.reverse()
+                        right_word.pop(0)
+                else:
+                    break
+
         if result:
             return [{"id": res[0], "text": res[1]} for res in result]
         return []
@@ -652,7 +730,7 @@ def get_poem_audio(lessonId: int):
         big_audios = []
         for i in range(0, len(files), 2):
             output_file = f'{lessonId}l{i}.mp3'
-            concatenate_audio_with_pause([files[i], files[i+1]], f"static/audio_big_poem/{output_file}")
+            concatenate_audio_with_pause([files[i], files[i + 1]], f"static/audio_big_poem/{output_file}")
             big_audios.append(f"{url_server}/static/audio_big_poem/{output_file}")
 
         if result:
@@ -665,11 +743,10 @@ def get_poem_audio(lessonId: int):
                             "smallAudio": f"{url_server}/static/audio_poem/{result[k][1]}",
                             "rowOne": result[k][0].split('\n')[0],
                             "rowTwo": result[k][0].split('\n')[1]
-                        } for k in range(i*2, i*2+2)
+                        } for k in range(i * 2, i * 2 + 2)
                     ]
-                }for i, big_audio in enumerate(big_audios)
+                } for i, big_audio in enumerate(big_audios)
             ]
-
 
         return []
     except sqlite3.Error as e:
@@ -767,14 +844,14 @@ def edit_lesson_lessonId(new_lesson: GetWords):
             url = 'static/audio_word'
             words = new_lesson.words.split(', ')
             for word in words:
-                cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);', (new_lesson.lessonId, word))
+                cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);', (new_lesson.lessonId, word.upper()))
                 conn.commit()
-                cursor.execute('INSERT OR IGNORE INTO words_data (word, status) VALUES (?, ?);', (word.lower(), 0))
+                cursor.execute('INSERT OR IGNORE INTO words_data (word, status) VALUES (?, ?);', (word.upper(), 0))
                 if cursor.rowcount > 0:
-                    audio_url = main(word.lower(), url, word.lower())
+                    audio_url = main(word.lower(), url, word.upper())
                     audio_url = convert_wav_to_mp3(audio_url, url)
                     cursor.execute('UPDATE words_data SET audio = ? WHERE word = ?;',
-                                   (audio_url, word.lower()))
+                                   (audio_url, word.upper()))
             conn.commit()
 
         cursor.execute('DELETE FROM lesson_sentences WHERE lesson_id = ?;', (new_lesson.lessonId,))
@@ -782,7 +859,8 @@ def edit_lesson_lessonId(new_lesson: GetWords):
             sentences = new_lesson.sentences.split('.')
             for word in sentences:
                 cursor.execute(
-                    'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);', (new_lesson.lessonId, word.strip()))
+                    'INSERT INTO lesson_sentences (lesson_id, sentences) VALUES (?, ?);',
+                    (new_lesson.lessonId, word.strip()))
             conn.commit()
 
         cursor.execute('DELETE FROM lesson_poem WHERE lesson_id = ?;', (new_lesson.lessonId,))
@@ -864,5 +942,71 @@ def check_image(words):
     return result
 
 
-def task_result_correspondence(result: Result, userId):
-    pass
+# def task_result_correspondence(result: ResultGame, userId):
+#     conn = sqlite3.connect('text.db')
+#     cursor = conn.cursor()
+#     now = datetime.now(timezone.utc)
+#     date_solving = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+#
+#     cursor.execute(
+#         'INSERT OR REPLACE INTO solving_result (lesson_id, student_id, date_solving, correspondenceResult) VALUES (?, ?, ?, ?);',
+#         (result.lessonId, userId, date_solving, result.result))
+#     conn.commit()
+#     cursor.close()
+#     conn.close()
+#     return result
+#
+#
+# def task_result_sentence(result: ResultGame, userId):
+#     try:
+#         conn = sqlite3.connect('text.db')
+#         cursor = conn.cursor()
+#         now = datetime.now(timezone.utc)
+#         date_solving = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+#
+#         cursor.execute(
+#             'INSERT OR REPLACE INTO solving_result (lesson_id, student_id, date_solving, sentenceResult) VALUES (?, ?, ?, ?);',
+#             (result.lessonId, userId, date_solving, result.result))
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+#         return JSONResponse(status_code=200, content={"message": ''})
+#
+#     except:
+#         return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
+#
+#
+# def task_result_speaking(result: ResultGame, userId):
+#     try:
+#         conn = sqlite3.connect('text.db')
+#         cursor = conn.cursor()
+#         now = datetime.now(timezone.utc)
+#         date_solving = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+#
+#         cursor.execute(
+#             'INSERT OR REPLACE INTO solving_result (lesson_id, student_id, date_solving, speakingResult) VALUES (?, ?, ?, ?);',
+#             (result.lessonId, userId, date_solving, result.result))
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+#         return JSONResponse(status_code=200, content={"message": ''})
+#     except:
+#         return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
+
+
+def task_result(result: ResultGame, userId):
+    try:
+        conn = sqlite3.connect('text.db')
+        cursor = conn.cursor()
+        now = datetime.now(timezone.utc)
+        date_solving = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        cursor.execute(
+            'INSERT INTO solving_result (lesson_id, student_id, item_id, job_type, results, date_solving) VALUES (?, ?, ?, ?, ?, ?);',
+            (result.lessonId, userId, result.item_id, result.exerciseType, result.result, date_solving))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return JSONResponse(status_code=200, content={"message": ''})
+    except:
+        return JSONResponse(status_code=500, content={"message": ''})

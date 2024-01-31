@@ -64,6 +64,8 @@ class GetWords(BaseModel):
     enabledTasks: Optional[list] = None
 
 
-class Result(BaseModel):
-    lessonId: int
-    result: int
+class ResultGame(BaseModel):
+    lessonId: int     #Id урока
+    item_id: int      #Id предложения или слова,
+    exerciseType: str #тип задания
+    result: bool      #результат

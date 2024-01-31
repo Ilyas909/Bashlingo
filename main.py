@@ -6,13 +6,14 @@ from fastapi import Form
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request
-from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, AudioFile, Result
+from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, AudioFile, \
+    ResultGame
 from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teacherID, add_new_classdb, \
     add_new_studentdb, get_class_info_by_id, update_class_namedb, update_student_namedb, delete_student, \
     get_class_lessons_by_id, add_lesson, get_lessons_by_studentId, get_lesson_menu_by_lessonId, get_lesson_by_id, \
     lesson_availability, delete_lesson_by_id, fetch_lesson_results, username_update, get_username, save_avatar, \
     check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId, check_image, get_sentence, \
-    get_speaking, task_result_correspondence
+    get_speaking, task_result
 import json
 from fastapi.staticfiles import StaticFiles
 from email import message_from_bytes
@@ -357,27 +358,30 @@ def compliance_check(lessonId, request: Request):
 
 @app.get('/tasks/correspondence/{lessonId}')
 def get_correspondence_tasks(lessonId: int, request: Request):
+    userId = get_current_student(request)
     check = compliance_check(lessonId, request)
     if check:
-        res = image_words(lessonId)
+        res = image_words(lessonId, userId)
         return res
     return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
 
 
 @app.get('/tasks/sentence/{lessonId}')
 def get_sentence_tasks(lessonId: int, request: Request):
+    userId = get_current_student(request)
     check = compliance_check(lessonId, request)
     if check:
-        res = get_sentence(lessonId)
+        res = get_sentence(lessonId, userId)
         return res
     return JSONResponse(status_code=404, content={"message": 'пользователь не авторизован'})
 
 
 @app.get('/tasks/speaking/{lessonId}')
 def get_speaking_tasks(lessonId: int, request: Request):
+    userId = get_current_student(request)
     check = compliance_check(lessonId, request)
     if check:
-        res = get_speaking(lessonId)
+        res = get_speaking(lessonId, userId)
         return res
     return JSONResponse(status_code=404, content={"message": 'пользователь не авторизован'})
 
@@ -439,11 +443,25 @@ def get_lesson_menu(lessonId: int, request: Request):
         return userId
 
 
-@app.put('/tasks/correspondence/result')
-def result_correspondence(result: Result, request: Request):
+# @app.put('/tasks/correspondence/result')
+# def result_correspondence(result: ResultGame, request: Request):
+#     pass
+#
+#
+# @app.put('/tasks/sentence/result')
+# def result_correspondence(result: ResultGame, request: Request):
+#     pass
+#
+#
+# @app.put('/tasks/speaking/result')
+# def result_correspondence(result: ResultGame, request: Request):
+#     pass
+
+@app.put('/tasks/result')
+def result_tasks(result: ResultGame, request: Request):
     userId = get_current_student(request)
     if not isinstance(userId, JSONResponse):
-        res = task_result_correspondence(result, userId)
+        res = task_result(result, userId)
         return res
     else:
         return userId

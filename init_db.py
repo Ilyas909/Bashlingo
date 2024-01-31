@@ -100,17 +100,19 @@ def sqlite_db():
                         CREATE TABLE IF NOT EXISTS solving_result (
                             id INTEGER PRIMARY KEY,
                             lesson_id INTEGER,
-                            student_id INTEGER
+                            student_id INTEGER,
+                            item_id INTEGER,
                             job_type TEXT,
-                            date_solving TEXT,
-                            correspondenceResult INTEGER,
-                            sentenceResult INTEGER,
-                            speakingResult INTEGER,
                             results BOOLEAN,
+                            date_solving TEXT,
                             FOREIGN KEY (lesson_id) REFERENCES lessons_list(id)
                             FOREIGN KEY (student_id) REFERENCES student(id)
                         )
                         ''')
+
+    cursor.execute('''CREATE INDEX IF NOT EXISTS idx_solving_result_lesson ON solving_result(lesson_id);''')
+    cursor.execute('''CREATE INDEX IF NOT EXISTS idx_solving_result_lesson_and_student ON solving_result(lesson_id, student_id);''')
+
 
     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS words_data (
