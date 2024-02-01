@@ -1,2 +1,5 @@
 /model/step_315496.onnx
 config.json
+.idea/*
+__pycache__
+venv

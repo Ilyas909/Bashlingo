@@ -441,21 +441,6 @@ def get_lesson_menu(lessonId: int, request: Request):
     else:
         return userId
 
-
-# @app.put('/tasks/correspondence/result')
-# def result_correspondence(result: ResultGame, request: Request):
-#     pass
-#
-#
-# @app.put('/tasks/sentence/result')
-# def result_correspondence(result: ResultGame, request: Request):
-#     pass
-#
-#
-# @app.put('/tasks/speaking/result')
-# def result_corresponimagedence(result: ResultGame, request: Request):
-#     pass
-
 @app.put('/tasks/result')
 def result_tasks(result: ResultGame, request: Request):
     userId = get_current_student(request)
