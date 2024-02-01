@@ -416,7 +416,6 @@ def get_poem(lessonId: int, request: Request):
 @app.get('/tasks/text/{lessonId}')
 def get_text(lessonId: int, request: Request):
     check = compliance_check(lessonId, request)
-    check = 1
     if check:
         res = get_text_audio(lessonId)
         return res
@@ -437,7 +436,7 @@ def create_item(request: Request):
 def get_lesson_menu(lessonId: int, request: Request):
     userId = get_current_user(request)
     if not isinstance(userId, JSONResponse):
-        lesson_menu = get_lesson_menu_by_lessonId(lessonId)
+        lesson_menu = get_lesson_menu_by_lessonId(lessonId, userId)
         return lesson_menu
     else:
         return userId
@@ -454,7 +453,7 @@ def get_lesson_menu(lessonId: int, request: Request):
 #
 #
 # @app.put('/tasks/speaking/result')
-# def result_correspondence(result: ResultGame, request: Request):
+# def result_corresponimagedence(result: ResultGame, request: Request):
 #     pass
 
 @app.put('/tasks/result')

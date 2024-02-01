@@ -5,7 +5,7 @@ import os
 import sqlite3
 import random
 from json import JSONDecodeError
-
+from collections import defaultdict
 from fastapi import FastAPI
 from pydub import AudioSegment
 
@@ -274,7 +274,8 @@ def add_lesson(new_lesson: GetWords):
                 os.makedirs(f"./{url}")
             words = new_lesson.words.split(', ')
             for word in words:
-                cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);', (new_lesson_id, word.upper()))
+                cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);',
+                               (new_lesson_id, word.upper()))
                 conn.commit()
                 cursor.execute('INSERT OR IGNORE INTO words_data (word, status) VALUES (?, ?);', (word.upper(), 0))
                 if cursor.rowcount > 0:
@@ -362,7 +363,7 @@ def contains_letters_or_digits(s):
 
 def get_audio_length(file_path):
     audio = AudioSegment.from_file(file_path)
-    duration_in_seconds = len(audio)  # преобразование миллисекунд в секунды
+    duration_in_seconds = len(audio)
     return duration_in_seconds
 
 
@@ -384,19 +385,44 @@ def get_lessons_by_studentId(studentId):
         return []
 
 
-def get_lesson_menu_by_lessonId(lessonId: int):
+def get_lesson_menu_by_lessonId(lessonId: int, userId: int):
     conn = sqlite3.connect('text.db')
     cursor = conn.cursor()
     lesson_menu = cursor.execute('SELECT * FROM lessons_list WHERE id = ?;', (lessonId,)).fetchone()
+    if lesson_menu[3] > 0:
+        NounsCurrentScore = cursor.execute('''
+                    SELECT 
+                        COUNT(*) as count_true_results
+                    FROM solving_result
+                    WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
+                    ''', (lessonId, userId, 'correspondence')).fetchall()
+    if lesson_menu[4] > 0:
+        PronounsCurrentScore = cursor.execute('''
+                    SELECT 
+                        COUNT(*) as count_true_results
+                    FROM solving_result
+                    WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
+                    ''', (lessonId, userId, 'sentence')).fetchall()
+
+    if lesson_menu[5] > 0:
+        VerbsCurrentScore = cursor.execute('''
+                    SELECT 
+                        COUNT(*) as count_true_results
+                    FROM solving_result
+                    WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
+                    ''', (lessonId, userId, 'speaking')).fetchall()
     cursor.close()
     conn.close()
     if lesson_menu:
         words_to_add = [
-            "Nouns" if lesson_menu[3] > 0 else "",
-            "Pronouns" if lesson_menu[4] > 0 else "",
-            "Verbs" if lesson_menu[5] > 0 else "",
-            "Poem" if lesson_menu[6] else "",
-            "Read" if lesson_menu[7] else ""
+            {'name': "Nouns", 'maxScore': lesson_menu[3], 'currentScore': NounsCurrentScore} if lesson_menu[
+                                                                                                    3] > 0 else "",
+            {'name': "Pronouns", 'maxScore': lesson_menu[4], 'currentScore': PronounsCurrentScore} if lesson_menu[
+                                                                                                          4] > 0 else "",
+            {'name': "Verbs", 'maxScore': lesson_menu[5], 'currentScore': VerbsCurrentScore} if lesson_menu[
+                                                                                                    5] > 0 else "",
+            {'name': "Poem"} if lesson_menu[6] else "",
+            {'name': "Read"} if lesson_menu[7] else ""
         ]
         # Отфильтруем только непустые значения
         words_to_add = list(filter(lambda word: word != "", words_to_add))
@@ -504,32 +530,30 @@ def fetch_lesson_results(lessonId: EntityId):
             (lessonId,)).fetchone()
 
         results = cursor.execute('''
-            SELECT student.id, student.name, solving_result.correspondenceResult, solving_result.sentenceResult, solving_result.speakingResult
-            FROM student
-            JOIN solving_result ON student.id = solving_result.student_id
-            WHERE solving_result.lesson_id = ?;
+            SELECT student.id, student.name, job_type, COUNT(*) as count_true_results
+            FROM solving_result
+            JOIN student ON student.id = solving_result.student_id
+            WHERE results = true AND lesson_id = ?
+            GROUP BY student_id, job_type;
         ''', (lessonId,)).fetchall()
 
         cursor.close()
         conn.close()
 
-        for row in results:
-            student_id, student_name, correspondence_result, sentence_result, speaking_result = row
-            print(
-                f"Student ID: {student_id}, Name: {student_name}, Correspondence Result: {correspondence_result}, Sentence Result: {sentence_result}, Speaking Result: {speaking_result}")
+        student_results = defaultdict(lambda: {'correspondenceResult': 0, 'sentenceResult': 0, 'speakingResult': 0})
+        for item in results:
+            student_id, name, job_type, result = item
+            student_results[student_id]['id'] = student_id
+            student_results[student_id]['name'] = name
+            student_results[student_id][f'{job_type}Result'] += result
+
+        result_json = list(student_results.values())
+        print(result_json)
 
         return {
             "lessonResults": {
                 "lessonTitle": lessonTitle,
-                "studentsResults": [
-                    {
-                        "id": row[0],
-                        "name": row[1],
-                        "correspondenceResult": row[2],
-                        "sentenceResult": row[3],
-                        "speakingResult": row[4]
-                    } for row in results
-                ],
+                "studentsResults": result_json,
                 "maxCorrespondenceResult": maxCorrespondenceResult,
                 "maxSentenceResult": maxSentenceResult,
                 "maxSpeakingResult": maxSpeakingResult
@@ -599,24 +623,28 @@ def image_words(lessonId: int, userId: int):
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
         count_task = cursor.execute('SELECT matching_game FROM lessons_list WHERE id = ?;',
-                                (lessonId,)).fetchone()
+                                    (lessonId,)).fetchone()
         result = cursor.execute(
-            'SELECT lw.id, wd.word, wd.image FROM words_data wd JOIN lesson_word lw ON wd.word = lw.word WHERE lw.lesson_id = ? AND wd.status = 1;',
+            'SELECT lw.id, wd.word, wd.image, wd.audio FROM words_data wd JOIN lesson_word lw ON wd.word = lw.word WHERE lw.lesson_id = ? AND wd.status = 1;',
             (lessonId,)).fetchall()
-        right_word = cursor.execute('SELECT item_id FROM solving_result WHERE lesson_id = ? AND student_id = ? AND job_type = "correspondence" AND results = true;',
-                                (lessonId, userId,)).fetchall()
+        right_word = cursor.execute(
+            'SELECT item_id FROM solving_result WHERE lesson_id = ? AND student_id = ? AND job_type = "correspondence" AND results = true;',
+            (lessonId, userId,)).fetchall()
         cursor.close()
         conn.close()
 
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
-        if count_task > len(result):
-            result *= math.ceil(count_task / len(result))
-            result = result[:count_task]
 
+        if result:
+            if count_task > len(result):
+                result *= math.ceil(count_task / len(result))
+                result = result[:count_task]
+            elif count_task < len(result):
+                result = result[:count_task]
 
-        if right_word:
+            # if right_word:
             for wordId in result:
                 if right_word:
                     if list(wordId)[0] in right_word:
@@ -627,10 +655,12 @@ def image_words(lessonId: int, userId: int):
                 else:
                     break
 
-        if result:
-            return [{"id": res[0], "word": res[1], "image": f"{url_server}/static/image_word/{res[2]}"} for res in
-                    result]
-        return []
+            result = list(set(result))
+
+            return {'tasks': [{"id": res[0], "word": res[1], "image": f"{url_server}/static/image_word/{res[2]}",
+                               "audioUrl": f"{url_server}/static/audio_word/{res[3]}"} for res in
+                              result], 'currentScore': len(right_word), 'maxScore': count_task}
+        return {'tasks': [], 'currentScore': len(right_word), 'maxScore': count_task}
     except sqlite3.Error as e:
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
 
@@ -652,11 +682,15 @@ def get_sentence(lessonId: int, userId: int):
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
-        if count_task > len(result):
-            result *= math.ceil(count_task / len(result))
-            result = result[:count_task]
 
-        if right_word:
+        if result:
+            if count_task > len(result):
+                result *= math.ceil(count_task / len(result))
+                result = result[:count_task]
+            elif count_task < len(result):
+                result = result[:count_task]
+
+            # if right_word:
             for wordId in result:
                 if right_word:
                     if list(wordId)[0] in right_word:
@@ -667,9 +701,10 @@ def get_sentence(lessonId: int, userId: int):
                 else:
                     break
 
-        if result:
-            return [{"id": res[0], "sentence": res[1]} for res in result]
-        return []
+            result = list(set(result))
+            return {'tasks': [{"id": res[0], "sentence": res[1]} for res in result], 'currentScore': len(right_word),
+                    'maxScore': count_task}
+        return {'tasks': [], 'currentScore': len(right_word), 'maxScore': count_task}
     except sqlite3.Error as e:
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
 
@@ -690,11 +725,15 @@ def get_speaking(lessonId: int, userId: int):
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
-        if count_task > len(result):
-            result *= math.ceil(count_task / len(result))
-            result = result[:count_task]
 
-        if right_word:
+        if result:
+            if count_task > len(result):
+                result *= math.ceil(count_task / len(result))
+                result = result[:count_task]
+            elif count_task < len(result):
+                result = result[:count_task]
+
+            # if right_word:
             for wordId in result:
                 if right_word:
                     if list(wordId)[0] in right_word:
@@ -705,9 +744,11 @@ def get_speaking(lessonId: int, userId: int):
                 else:
                     break
 
-        if result:
-            return [{"id": res[0], "text": res[1]} for res in result]
-        return []
+            result = list(set(result))
+
+            return {'tasks': [{"id": res[0], "text": res[1]} for res in result], 'currentScore': len(right_word),
+                    'maxScore': count_task}
+        return {'tasks': [], 'currentScore': len(right_word), 'maxScore': count_task}
     except sqlite3.Error as e:
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
 
@@ -766,7 +807,7 @@ def concatenate_audio_with_pause(files, output_file, pause_duration=400):
         segments.append(pause)  # Добавляем паузу после каждого аудиофайла
 
     # Убираем последнюю паузу
-    # segments.pop()
+    segments.pop()
 
     # Объединяем все аудиосегменты
     result = AudioSegment.empty()
@@ -792,8 +833,8 @@ def get_text_audio(lessonId: int):
         output_file = f'{lessonId}.mp3'
         concatenate_audio_with_pause(files, f"static/audio_big_text/{output_file}")
         title = result[0][0]
+        print(get_audio_length(f"static/audio_big_text/{output_file}"))
         big_audio = f"{url_server}/static/audio_big_text/{output_file}"
-
         if result:
             return {
                 "title": title,
@@ -844,7 +885,8 @@ def edit_lesson_lessonId(new_lesson: GetWords):
             url = 'static/audio_word'
             words = new_lesson.words.split(', ')
             for word in words:
-                cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);', (new_lesson.lessonId, word.upper()))
+                cursor.execute('INSERT INTO lesson_word (lesson_id, word) VALUES (?, ?);',
+                               (new_lesson.lessonId, word.upper()))
                 conn.commit()
                 cursor.execute('INSERT OR IGNORE INTO words_data (word, status) VALUES (?, ?);', (word.upper(), 0))
                 if cursor.rowcount > 0:
