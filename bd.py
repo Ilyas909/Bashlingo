@@ -435,8 +435,8 @@ def get_lesson_by_id(lessonId: int):
     try:
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
-        title, class_id, date_lesson = cursor.execute(
-            'SELECT title, class_id, date_lesson FROM lessons_list WHERE id = ?;',
+        title, class_id, date_lesson, correspondence, sentence, speaking = cursor.execute(
+            'SELECT title, class_id, date_lesson, matching_game, contents_offer, say_the_word FROM lessons_list WHERE id = ?;',
             (lessonId,)).fetchone()
         words = cursor.execute('SELECT word FROM lesson_word WHERE lesson_id = ?;', (lessonId,)).fetchall()
         sentences = cursor.execute('SELECT sentences FROM lesson_sentences WHERE lesson_id = ?;',
@@ -458,6 +458,15 @@ def get_lesson_by_id(lessonId: int):
 
         flat_words_list = [word[0] for word in reading]
         reading = '. '.join(flat_words_list)
+
+        enabledTasks = []
+        if correspondence > 0:
+            enabledTasks.append({"type": 'correspondence', "maxScore": correspondence})
+        if sentence > 0:
+            enabledTasks.append({"type": 'sentence', "maxScore": sentence})
+        if speaking > 0:
+            enabledTasks.append({"type": 'speaking', "maxScore": speaking})
+
         return {
             "lesson": {
                 "theme": title,
@@ -465,7 +474,8 @@ def get_lesson_by_id(lessonId: int):
                 "sentences": sentences,
                 "poem": poem,
                 "reading": reading,
-                "date": date_lesson
+                "date": date_lesson,
+                "enabledTasks": enabledTasks
             },
             "classId": class_id
         }
