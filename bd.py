@@ -395,14 +395,14 @@ def get_lesson_menu_by_lessonId(lessonId: int, userId: int):
                         COUNT(*) as count_true_results
                     FROM solving_result
                     WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
-                    ''', (lessonId, userId, 'correspondence')).fetchall()
+                    ''', (lessonId, userId, 'correspondence')).fetchone()
     if lesson_menu[4] > 0:
         PronounsCurrentScore = cursor.execute('''
                     SELECT 
                         COUNT(*) as count_true_results
                     FROM solving_result
                     WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
-                    ''', (lessonId, userId, 'sentence')).fetchall()
+                    ''', (lessonId, userId, 'sentence')).fetchone()
 
     if lesson_menu[5] > 0:
         VerbsCurrentScore = cursor.execute('''
@@ -410,16 +410,16 @@ def get_lesson_menu_by_lessonId(lessonId: int, userId: int):
                         COUNT(*) as count_true_results
                     FROM solving_result
                     WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
-                    ''', (lessonId, userId, 'speaking')).fetchall()
+                    ''', (lessonId, userId, 'speaking')).fetchone()
     cursor.close()
     conn.close()
     if lesson_menu:
         words_to_add = [
-            {'name': "Nouns", 'maxScore': lesson_menu[3], 'currentScore': NounsCurrentScore} if lesson_menu[
+            {'name': "Nouns", 'maxScore': lesson_menu[3], 'currentScore': NounsCurrentScore[0]} if lesson_menu[
                                                                                                     3] > 0 else "",
-            {'name': "Pronouns", 'maxScore': lesson_menu[4], 'currentScore': PronounsCurrentScore} if lesson_menu[
+            {'name': "Pronouns", 'maxScore': lesson_menu[4], 'currentScore': PronounsCurrentScore[0]} if lesson_menu[
                                                                                                           4] > 0 else "",
-            {'name': "Verbs", 'maxScore': lesson_menu[5], 'currentScore': VerbsCurrentScore} if lesson_menu[
+            {'name': "Verbs", 'maxScore': lesson_menu[5], 'currentScore': VerbsCurrentScore[0]} if lesson_menu[
                                                                                                     5] > 0 else "",
             {'name': "Poem"} if lesson_menu[6] else "",
             {'name': "Read"} if lesson_menu[7] else ""
@@ -775,7 +775,6 @@ def get_poem_audio(lessonId: int):
             big_audios.append(f"{url_server}/static/audio_big_poem/{output_file}")
 
         if result:
-            i = 0
             return [
                 {
                     "audio": big_audio,
@@ -783,9 +782,11 @@ def get_poem_audio(lessonId: int):
                         {
                             "smallAudio": f"{url_server}/static/audio_poem/{result[k][1]}",
                             "rowOne": result[k][0].split('\n')[0],
-                            "rowTwo": result[k][0].split('\n')[1]
+                            "rowTwo": result[k][0].split('\n')[1],
+                            "id": result[k][2]
                         } for k in range(i * 2, i * 2 + 2)
-                    ]
+                    ],
+                    "id": i+1
                 } for i, big_audio in enumerate(big_audios)
             ]
 
@@ -982,58 +983,6 @@ def check_image(words):
     cursor.close()
     conn.close()
     return result
-
-
-# def task_result_correspondence(result: ResultGame, userId):
-#     conn = sqlite3.connect('text.db')
-#     cursor = conn.cursor()
-#     now = datetime.now(timezone.utc)
-#     date_solving = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-#
-#     cursor.execute(
-#         'INSERT OR REPLACE INTO solving_result (lesson_id, student_id, date_solving, correspondenceResult) VALUES (?, ?, ?, ?);',
-#         (result.lessonId, userId, date_solving, result.result))
-#     conn.commit()
-#     cursor.close()
-#     conn.close()
-#     return result
-#
-#
-# def task_result_sentence(result: ResultGame, userId):
-#     try:
-#         conn = sqlite3.connect('text.db')
-#         cursor = conn.cursor()
-#         now = datetime.now(timezone.utc)
-#         date_solving = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-#
-#         cursor.execute(
-#             'INSERT OR REPLACE INTO solving_result (lesson_id, student_id, date_solving, sentenceResult) VALUES (?, ?, ?, ?);',
-#             (result.lessonId, userId, date_solving, result.result))
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-#         return JSONResponse(status_code=200, content={"message": ''})
-#
-#     except:
-#         return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
-#
-#
-# def task_result_speaking(result: ResultGame, userId):
-#     try:
-#         conn = sqlite3.connect('text.db')
-#         cursor = conn.cursor()
-#         now = datetime.now(timezone.utc)
-#         date_solving = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-#
-#         cursor.execute(
-#             'INSERT OR REPLACE INTO solving_result (lesson_id, student_id, date_solving, speakingResult) VALUES (?, ?, ?, ?);',
-#             (result.lessonId, userId, date_solving, result.result))
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-#         return JSONResponse(status_code=200, content={"message": ''})
-#     except:
-#         return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
 
 
 def task_result(result: ResultGame, userId):

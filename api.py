@@ -17,10 +17,6 @@ class User(BaseModel):
     username: str
 
 
-class ClassID(BaseModel):
-    id: int
-
-
 class NewName(BaseModel):
     newName: str
 
