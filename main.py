@@ -531,5 +531,5 @@ def range_requests_response(
 @app.get("/big_audio/{lessonId}")
 def get_video(lessonId:int, request: Request):
     return range_requests_response(
-        request, file_path=f"static/audio_big_text/{lessonId}", content_type="audio/mpeg"
+        request, file_path=f"static/audio_big_text/{lessonId}.mp3", content_type="audio/mpeg"
     )
