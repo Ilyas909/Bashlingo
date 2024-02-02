@@ -635,7 +635,7 @@ def image_words(lessonId: int, userId: int):
                                         COUNT(*) as count_true_results
                                     FROM solving_result
                                     WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
-                                    ''', (lessonId, userId, 'sentence')).fetchone()
+                                    ''', (lessonId, userId, 'correspondence')).fetchone()
         cursor.close()
         conn.close()
 
@@ -737,7 +737,7 @@ def get_speaking(lessonId: int, userId: int):
                                         COUNT(*) as count_true_results
                                     FROM solving_result
                                     WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
-                                    ''', (lessonId, userId, 'sentence')).fetchone()
+                                    ''', (lessonId, userId, 'speaking')).fetchone()
         cursor.close()
         conn.close()
 
