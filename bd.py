@@ -835,11 +835,11 @@ def get_text_audio(lessonId: int):
         concatenate_audio_with_pause(files, f"static/audio_big_text/{output_file}")
         title = result[0][0]
         print(get_audio_length(f"static/audio_big_text/{output_file}"))
-        big_audio = f"{url_server}/static/audio_big_text/{output_file}"
+        streaming_audio_url = f"{url_server}/big_audio/{lessonId}"
         if result:
             return {
                 "title": title,
-                "audio": big_audio,
+                "audio": streaming_audio_url,
                 "paragraphs": [
                     {
                         "sentences": [
