@@ -652,7 +652,7 @@ def image_words(lessonId: int, userId: int):
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
-
+        remainder = count_task - PronounsCurrentScore[0]
         if result and count_task > PronounsCurrentScore[0]:
             if count_task > len(result):
                 result *= math.ceil(count_task / len(result))
@@ -672,6 +672,8 @@ def image_words(lessonId: int, userId: int):
                     break
 
             result = list(set(result))
+            if len(result) > remainder:
+                result = result[:remainder]
 
             return {'tasks': [{"id": res[0], "word": res[1], "image": f"{url_server}/static/image_word/{res[2]}",
                                "audioUrl": f"{url_server}/static/audio_word/{res[3]}"} for res in
@@ -705,6 +707,7 @@ def get_sentence(lessonId: int, userId: int):
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
+        remainder = count_task - PronounsCurrentScore[0]
 
         if result and count_task > PronounsCurrentScore[0]:
             if count_task > len(result):
@@ -725,6 +728,8 @@ def get_sentence(lessonId: int, userId: int):
                     break
 
             result = list(set(result))
+            if len(result) > remainder:
+                result = result[:remainder]
             return {'tasks': [{"id": res[0], "sentence": res[1]} for res in result], 'currentScore': PronounsCurrentScore[0],
                     'maxScore': count_task}
         return {'tasks': [], 'currentScore': PronounsCurrentScore[0], 'maxScore': count_task}
@@ -754,6 +759,7 @@ def get_speaking(lessonId: int, userId: int):
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
+        remainder = count_task - PronounsCurrentScore[0]
 
         if result and count_task > PronounsCurrentScore[0]:
             if count_task > len(result):
@@ -774,7 +780,8 @@ def get_speaking(lessonId: int, userId: int):
                     break
 
             result = list(set(result))
-
+            if len(result) > remainder:
+                result = result[:remainder]
             return {'tasks': [{"id": res[0], "text": res[1]} for res in result], 'currentScore': PronounsCurrentScore[0],
                     'maxScore': count_task}
         return {'tasks': [], 'currentScore': PronounsCurrentScore[0], 'maxScore': count_task}
