@@ -1,4 +1,5 @@
 import os
+import re
 from json import JSONDecodeError
 import shutil
 from fastapi import FastAPI, Depends, UploadFile, File
@@ -170,7 +171,7 @@ def get_classes_list(request: Request):
 def add_new_class(new_class: NewClass, request: Request):
     userId = get_current_teacher(request)
     if not isinstance(userId, JSONResponse):
-        new_class.studentsList = new_class.studentsList.split(', ')
+        new_class.studentsList = [item.strip() for item in re.split(',|\n', new_class.studentsList) if item.strip()]
         id_add_class = add_new_classdb(new_class, userId)
         if id_add_class:
             add_student = add_new_studentdb(new_class, id_add_class)
