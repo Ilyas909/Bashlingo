@@ -25,7 +25,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Настройка CORS
 origins = [
-    "http://localhost:3000"  # Если ваш React-приложение работает на этом порту
+    "http://localhost:3000" ,
+    "http://localhost:5000",
+    "https://bashtel.online",
 ]
 
 app.add_middleware(
