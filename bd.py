@@ -435,8 +435,8 @@ def get_lesson_by_id(lessonId: int):
     try:
         conn = sqlite3.connect('text.db')
         cursor = conn.cursor()
-        title, class_id, date_lesson = cursor.execute(
-            'SELECT title, class_id, date_lesson FROM lessons_list WHERE id = ?;',
+        title, class_id, date_lesson, correspondence, sentence, speaking = cursor.execute(
+            'SELECT title, class_id, date_lesson, matching_game, contents_offer, say_the_word FROM lessons_list WHERE id = ?;',
             (lessonId,)).fetchone()
         words = cursor.execute('SELECT word FROM lesson_word WHERE lesson_id = ?;', (lessonId,)).fetchall()
         sentences = cursor.execute('SELECT sentences FROM lesson_sentences WHERE lesson_id = ?;',
@@ -458,6 +458,15 @@ def get_lesson_by_id(lessonId: int):
 
         flat_words_list = [word[0] for word in reading]
         reading = '. '.join(flat_words_list)
+
+        enabledTasks = []
+        if correspondence > 0:
+            enabledTasks.append({"type": 'correspondence', "maxScore": correspondence})
+        if sentence > 0:
+            enabledTasks.append({"type": 'sentence', "maxScore": sentence})
+        if speaking > 0:
+            enabledTasks.append({"type": 'speaking', "maxScore": speaking})
+
         return {
             "lesson": {
                 "theme": title,
@@ -465,7 +474,8 @@ def get_lesson_by_id(lessonId: int):
                 "sentences": sentences,
                 "poem": poem,
                 "reading": reading,
-                "date": date_lesson
+                "date": date_lesson,
+                "enabledTasks": enabledTasks
             },
             "classId": class_id
         }
@@ -630,14 +640,20 @@ def image_words(lessonId: int, userId: int):
         right_word = cursor.execute(
             'SELECT item_id FROM solving_result WHERE lesson_id = ? AND student_id = ? AND job_type = "correspondence" AND results = true;',
             (lessonId, userId,)).fetchall()
+        PronounsCurrentScore = cursor.execute('''
+                                    SELECT 
+                                        COUNT(*) as count_true_results
+                                    FROM solving_result
+                                    WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
+                                    ''', (lessonId, userId, 'correspondence')).fetchone()
         cursor.close()
         conn.close()
 
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
-
-        if result:
+        remainder = count_task - PronounsCurrentScore[0]
+        if result and count_task > PronounsCurrentScore[0]:
             if count_task > len(result):
                 result *= math.ceil(count_task / len(result))
                 result = result[:count_task]
@@ -656,11 +672,13 @@ def image_words(lessonId: int, userId: int):
                     break
 
             result = list(set(result))
+            if len(result) > remainder:
+                result = result[:remainder]
 
             return {'tasks': [{"id": res[0], "word": res[1], "image": f"{url_server}/static/image_word/{res[2]}",
                                "audioUrl": f"{url_server}/static/audio_word/{res[3]}"} for res in
-                              result], 'currentScore': len(right_word), 'maxScore': count_task}
-        return {'tasks': [], 'currentScore': len(right_word), 'maxScore': count_task}
+                              result], 'currentScore': PronounsCurrentScore[0], 'maxScore': count_task}
+        return {'tasks': [], 'currentScore': PronounsCurrentScore[0], 'maxScore': count_task}
     except sqlite3.Error as e:
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
 
@@ -676,14 +694,22 @@ def get_sentence(lessonId: int, userId: int):
         right_word = cursor.execute(
             'SELECT item_id FROM solving_result WHERE lesson_id = ? AND student_id = ? AND job_type = "sentence" AND results = true;',
             (lessonId, userId,)).fetchall()
+
+        PronounsCurrentScore = cursor.execute('''
+                            SELECT 
+                                COUNT(*) as count_true_results
+                            FROM solving_result
+                            WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
+                            ''', (lessonId, userId, 'sentence')).fetchone()
         cursor.close()
         conn.close()
 
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
+        remainder = count_task - PronounsCurrentScore[0]
 
-        if result:
+        if result and count_task > PronounsCurrentScore[0]:
             if count_task > len(result):
                 result *= math.ceil(count_task / len(result))
                 result = result[:count_task]
@@ -702,9 +728,11 @@ def get_sentence(lessonId: int, userId: int):
                     break
 
             result = list(set(result))
-            return {'tasks': [{"id": res[0], "sentence": res[1]} for res in result], 'currentScore': len(right_word),
+            if len(result) > remainder:
+                result = result[:remainder]
+            return {'tasks': [{"id": res[0], "sentence": res[1]} for res in result], 'currentScore': PronounsCurrentScore[0],
                     'maxScore': count_task}
-        return {'tasks': [], 'currentScore': len(right_word), 'maxScore': count_task}
+        return {'tasks': [], 'currentScore': PronounsCurrentScore[0], 'maxScore': count_task}
     except sqlite3.Error as e:
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
 
@@ -719,14 +747,21 @@ def get_speaking(lessonId: int, userId: int):
         right_word = cursor.execute(
             'SELECT item_id FROM solving_result WHERE lesson_id = ? AND student_id = ? AND job_type = "speaking" AND results = true;',
             (lessonId, userId,)).fetchall()
+        PronounsCurrentScore = cursor.execute('''
+                                    SELECT 
+                                        COUNT(*) as count_true_results
+                                    FROM solving_result
+                                    WHERE results = true AND lesson_id = ? AND student_id = ? AND job_type = ?
+                                    ''', (lessonId, userId, 'speaking')).fetchone()
         cursor.close()
         conn.close()
 
         count_task = count_task[0]
         result_list = [item[0] for item in right_word]
         right_word = result_list
+        remainder = count_task - PronounsCurrentScore[0]
 
-        if result:
+        if result and count_task > PronounsCurrentScore[0]:
             if count_task > len(result):
                 result *= math.ceil(count_task / len(result))
                 result = result[:count_task]
@@ -745,10 +780,11 @@ def get_speaking(lessonId: int, userId: int):
                     break
 
             result = list(set(result))
-
-            return {'tasks': [{"id": res[0], "text": res[1]} for res in result], 'currentScore': len(right_word),
+            if len(result) > remainder:
+                result = result[:remainder]
+            return {'tasks': [{"id": res[0], "text": res[1]} for res in result], 'currentScore': PronounsCurrentScore[0],
                     'maxScore': count_task}
-        return {'tasks': [], 'currentScore': len(right_word), 'maxScore': count_task}
+        return {'tasks': [], 'currentScore': PronounsCurrentScore[0], 'maxScore': count_task}
     except sqlite3.Error as e:
         return JSONResponse(status_code=404, content={"message": 'поиск не удался'})
 
