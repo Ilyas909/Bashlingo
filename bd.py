@@ -8,16 +8,19 @@ from json import JSONDecodeError
 from collections import defaultdict
 from fastapi import FastAPI
 from pydub import AudioSegment
-
+from razdel import sentenize
 from starlette.staticfiles import StaticFiles
-
 from nail_tts import main
 from starlette.responses import JSONResponse
-
 from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, ResultGame
+import logging
+
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 try:
     with open("config.json", "r") as file:
@@ -84,7 +87,7 @@ def add_new_classdb(new_class: NewClass, teacherID):
         return added_class_id
     except Exception as e:
         # Если произошла ошибка, откатываем изменения
-        print(f"Ошибка: {e}")
+        logger.error(f"Ошибка: {e}")
         conn.rollback()
         cursor.close()
         conn.close()
@@ -140,7 +143,7 @@ def add_new_studentdb(new_class: NewClass, class_id):
         return True
     except Exception as e:
         # Если произошла ошибка, откатываем изменения
-        print(f"Ошибка: {e}")
+        logger.error(f"Ошибка: {e}")
         conn.rollback()
         cursor.close()
         conn.close()
@@ -180,7 +183,7 @@ def update_class_namedb(class_id: int, new_name: NewName):
         conn.close()
         return True
     except Exception as e:
-        print(f"Ошибка при обновлении названия класса: {e}")
+        logger.error(f"Ошибка: {e}")
         conn.rollback()
         conn.close()
         return False
@@ -214,7 +217,7 @@ def delete_student(student_id: int):
         conn.close()
         return True
     except Exception as e:
-        print(f"Ошибка при обновлении названия класса: {e}")
+        logger.error(f"Ошибка: {e}")
         conn.rollback()
         conn.close()
         return False
@@ -302,21 +305,25 @@ def add_lesson(new_lesson: GetWords):
             poem1 = new_lesson.poem.split('\n')
             poem = [item for item in poem1 if item.strip() != ""]
             for i in range(0, len(poem), 2):
-                double_line = poem[i] + '\n' + poem[i + 1]
+                double_line = poem[i] + '\n' + poem[i + 1] if i + 1 < len(poem) else poem[i]
                 cursor.execute(
                     'INSERT INTO lesson_poem (lesson_id, double_line) VALUES (?, ?);',
                     (new_lesson_id, double_line))
                 lesson_id = cursor.lastrowid
                 double_line = double_line.split('\n')
                 audio0 = main(double_line[0], url, f"{lesson_id}0v")
-                audio1 = main(double_line[1], url, f"{lesson_id}1v")
                 audioURL1 = convert_wav_to_mp3(audio0, url)
-                audioURL2 = convert_wav_to_mp3(audio1, url)
                 output_file = f"{lesson_id}.mp3"
-                concatenate_audio_with_pause([f'static/audio_poem/{audioURL1}', f'static/audio_poem/{audioURL2}'],
+                if i + 1 < len(poem):
+                    audio1 = main(double_line[1], url, f"{lesson_id}1v")
+                    audioURL2 = convert_wav_to_mp3(audio1, url)
+                    concatenate_audio_with_pause([f'static/audio_poem/{audioURL1}', f'static/audio_poem/{audioURL2}'],
                                              f'static/audio_poem/{output_file}')
+                    os.remove(f'static/audio_poem/{audioURL2}')
+                else:
+                    concatenate_audio_with_pause([f'static/audio_poem/{audioURL1}'],
+                                                 f'static/audio_poem/{output_file}')
                 os.remove(f'static/audio_poem/{audioURL1}')
-                os.remove(f'static/audio_poem/{audioURL2}')
 
                 cursor.execute('UPDATE lesson_poem SET audioURL = ? WHERE id = ?;',
                                (output_file, lesson_id))
@@ -327,13 +334,16 @@ def add_lesson(new_lesson: GetWords):
             url = 'static/audio_text'
             if not os.path.exists(f"./{url}"):
                 os.makedirs(f"./{url}")
-            reading = new_lesson.reading.split('.')
+            reading = new_lesson.reading
+            substrings_list = list(sentenize(reading))
+            reading = [substring.text for substring in substrings_list]
+            # reading = re.split(r'(?<=[.!?\n])\s+', reading)
             startTime = 0
             for line in reading:
                 if contains_letters_or_digits(line):
                     cursor.execute(
                         'INSERT INTO lesson_text (lesson_id, line) VALUES (?, ?);',
-                        (new_lesson_id, line + '.'))
+                        (new_lesson_id, line))
                     lesson_id = cursor.lastrowid
                     audioURL = main(line, url, lesson_id)
                     audioURL = convert_wav_to_mp3(audioURL, url)
@@ -350,7 +360,7 @@ def add_lesson(new_lesson: GetWords):
         return True
     except Exception as e:
         # Если произошла ошибка, откатываем изменения
-        print(f"Ошибка: {e}")
+        logger.error(f"Ошибка: {e}")
         conn.rollback()
         cursor.close()
         conn.close()
@@ -524,7 +534,7 @@ def delete_lesson_by_id(lesson_id: int, classId: int):
         else:
             return JSONResponse(status_code=400, content={"message": "Неверный classId"})
     except Exception as e:
-        print(f"Ошибка при обновлении названия класса: {e}")
+        logger.error(f"Ошибка: {e}")
         conn.rollback()
         conn.close()
         return JSONResponse(status_code=500, content={"message": "Не удалось удалить урок"})
@@ -558,7 +568,6 @@ def fetch_lesson_results(lessonId: EntityId):
             student_results[student_id][f'{job_type}Result'] += result
 
         result_json = list(student_results.values())
-        print(result_json)
 
         return {
             "lessonResults": {
@@ -624,7 +633,7 @@ def check_student(userId: int, lessonId: int):
             conn.close()
             return False
     except sqlite3.Error as e:
-        print(e)
+        logger.error(f"Ошибка: {e}")
         return False
 
 
@@ -807,7 +816,11 @@ def get_poem_audio(lessonId: int):
         big_audios = []
         for i in range(0, len(files), 2):
             output_file = f'{lessonId}l{i}.mp3'
-            concatenate_audio_with_pause([files[i], files[i + 1]], f"static/audio_big_poem/{output_file}")
+            if len(files) > i+1:
+                concatenate_audio_with_pause([files[i], files[i + 1]], f"static/audio_big_poem/{output_file}")
+            else:
+                concatenate_audio_with_pause([files[i]], f"static/audio_big_poem/{output_file}")
+
             big_audios.append(f"{url_server}/static/audio_big_poem/{output_file}")
 
         if result:
@@ -818,9 +831,9 @@ def get_poem_audio(lessonId: int):
                         {
                             "smallAudio": f"{url_server}/static/audio_poem/{result[k][1]}",
                             "rowOne": result[k][0].split('\n')[0],
-                            "rowTwo": result[k][0].split('\n')[1],
+                            "rowTwo": result[k][0].split('\n')[1] if len(result[k][0].split('\n')) > 1 else '',
                             "id": result[k][2]
-                        } for k in range(i * 2, i * 2 + 2)
+                        } for k in range(i * 2, i * 2 + 2) if len(result) > k
                     ],
                     "id": i+1
                 } for i, big_audio in enumerate(big_audios)
@@ -828,6 +841,7 @@ def get_poem_audio(lessonId: int):
 
         return []
     except sqlite3.Error as e:
+        logger.error(f"Ошибка: {e}")
         return JSONResponse(status_code=500, content={"message": 'поиск не удался'})
 
 
@@ -870,7 +884,6 @@ def get_text_audio(lessonId: int):
         output_file = f'{lessonId}.mp3'
         concatenate_audio_with_pause(files, f"static/audio_big_text/{output_file}")
         title = result[0][0]
-        print(get_audio_length(f"static/audio_big_text/{output_file}"))
         streaming_audio_url = f"{url_server}/big_audio/{lessonId}"
         if result:
             return {
@@ -890,7 +903,7 @@ def get_text_audio(lessonId: int):
             }
         return []
     except sqlite3.Error as e:
-        print(e)
+        logger.error(f"Ошибка: {e}")
         return JSONResponse(status_code=500, content={"message": 'поиск не удался'})
 
 
@@ -900,7 +913,6 @@ def edit_lesson_lessonId(new_lesson: GetWords):
     try:
         correspondence, sentence, speaking = 0, 0, 0
         for i in range(len(new_lesson.enabledTasks)):
-            print(new_lesson.enabledTasks[i]['type'])
             if new_lesson.enabledTasks[i]['type'] == 'correspondence':
                 correspondence = new_lesson.enabledTasks[i]['maxScore']
             elif new_lesson.enabledTasks[i]["type"] == 'sentence':
@@ -909,9 +921,9 @@ def edit_lesson_lessonId(new_lesson: GetWords):
                 speaking = new_lesson.enabledTasks[i]['maxScore']
 
         cursor.execute(
-            'UPDATE lessons_list SET class_id = ?, title = ?, matching_game = ?, contents_offer = ?, say_the_word = ?, poem = ?, reading = ?, date_lesson = ?, available = ? WHERE id = ?;',
+            'UPDATE lessons_list SET class_id = ?, title = ?, matching_game = ?, contents_offer = ?, say_the_word = ?, poem = ?, reading = ?, date_lesson = ? WHERE id = ?;',
             (new_lesson.classId, new_lesson.theme, correspondence, sentence, speaking,
-             True if new_lesson.poem else False, True if new_lesson.reading else False, new_lesson.date, False,
+             True if new_lesson.poem else False, True if new_lesson.reading else False, new_lesson.date,
              new_lesson.lessonId))
 
         new_lesson_id = cursor.lastrowid
@@ -948,21 +960,25 @@ def edit_lesson_lessonId(new_lesson: GetWords):
             poem1 = new_lesson.poem.split('\n')
             poem = [item for item in poem1 if item.strip() != ""]
             for i in range(0, len(poem), 2):
-                double_line = poem[i] + '\n' + poem[i + 1]
+                double_line = poem[i] + '\n' + poem[i + 1] if i + 1 < len(poem) else poem[i]
                 cursor.execute(
                     'INSERT INTO lesson_poem (lesson_id, double_line) VALUES (?, ?);',
                     (new_lesson.lessonId, double_line))
                 lesson_id = cursor.lastrowid
                 double_line = double_line.split('\n')
                 audio0 = main(double_line[0], url, f"{lesson_id}0v")
-                audio1 = main(double_line[1], url, f"{lesson_id}1v")
                 audioURL1 = convert_wav_to_mp3(audio0, url)
-                audioURL2 = convert_wav_to_mp3(audio1, url)
                 output_file = f"{lesson_id}.mp3"
-                concatenate_audio_with_pause([f'static/audio_poem/{audioURL1}', f'static/audio_poem/{audioURL2}'],
-                                             f'static/audio_poem/{output_file}')
+                if i + 1 < len(poem):
+                    audio1 = main(double_line[1], url, f"{lesson_id}1v")
+                    audioURL2 = convert_wav_to_mp3(audio1, url)
+                    concatenate_audio_with_pause([f'static/audio_poem/{audioURL1}', f'static/audio_poem/{audioURL2}'],
+                                                 f'static/audio_poem/{output_file}')
+                    os.remove(f'static/audio_poem/{audioURL2}')
+                else:
+                    concatenate_audio_with_pause([f'static/audio_poem/{audioURL1}'],
+                                                 f'static/audio_poem/{output_file}')
                 os.remove(f'static/audio_poem/{audioURL1}')
-                os.remove(f'static/audio_poem/{audioURL2}')
 
                 cursor.execute('UPDATE lesson_poem SET audioURL = ? WHERE id = ?;',
                                (output_file, lesson_id))
@@ -971,13 +987,16 @@ def edit_lesson_lessonId(new_lesson: GetWords):
         cursor.execute('DELETE FROM lesson_text WHERE lesson_id = ?;', (new_lesson.lessonId,))
         if new_lesson.reading:
             url = 'static/audio_text'
-            reading = new_lesson.reading.split('.')
+
+            reading = new_lesson.reading
+            substrings_list = list(sentenize(reading))
+            reading = [substring.text for substring in substrings_list]
             startTime = 0
             for line in reading:
                 if contains_letters_or_digits(line):
                     cursor.execute(
                         'INSERT INTO lesson_text (lesson_id, line) VALUES (?, ?);',
-                        (new_lesson.lessonId, line + '.'))
+                        (new_lesson.lessonId, line))
                     lesson_id = cursor.lastrowid
                     audioURL = main(line, url, lesson_id)
                     audioURL = convert_wav_to_mp3(audioURL, url)
@@ -994,7 +1013,7 @@ def edit_lesson_lessonId(new_lesson: GetWords):
         return True
     except Exception as e:
         # Если произошла ошибка, откатываем изменения
-        print(f"Ошибка: {e}")
+        logger.error(f"Ошибка: {e}")
         conn.rollback()
         cursor.close()
         conn.close()

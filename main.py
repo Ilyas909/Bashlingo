@@ -71,7 +71,6 @@ def save_session_data():
 
 def get_current_user(request: Request):
     cookie_session = request.cookies.get("session")
-    print('cookie_session=', cookie_session)
     # Получаем пользователя по значению куки
     user_id, role = session_storage.get(cookie_session, (None, None))
     if user_id is None or role is None:
@@ -409,7 +408,6 @@ async def send_speaking_answer(request: Request, correct_text: str = Form(...),
 @app.get('/tasks/poem/{lessonId}')
 def get_poem(lessonId: int, request: Request):
     check = compliance_check(lessonId, request)
-    check = 1
     if check:
         res = get_poem_audio(lessonId)
         return res
