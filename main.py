@@ -14,7 +14,7 @@ from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teach
     get_class_lessons_by_id, add_lesson, get_lessons_by_studentId, get_lesson_menu_by_lessonId, get_lesson_by_id, \
     lesson_availability, delete_lesson_by_id, fetch_lesson_results, username_update, get_username, save_avatar, \
     check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId, check_image, get_sentence, \
-    get_speaking, task_result
+    get_speaking, task_result, clone_class
 import json
 from fastapi.staticfiles import StaticFiles
 from email import message_from_bytes
@@ -452,6 +452,19 @@ def result_tasks(result: ResultGame, request: Request):
         return userId
 
 
+@app.put("/classes/clone")
+def clone_classes(classId: EntityId, request: Request):
+    userId = get_current_teacher(request)
+    if not isinstance(userId, JSONResponse):
+        res = clone_class(classId, userId)
+        return res
+    else:
+        return userId
+
+
+
+
+
 import os
 from typing import BinaryIO
 
@@ -534,3 +547,5 @@ def get_video(lessonId:int, request: Request):
     return range_requests_response(
         request, file_path=f"static/audio_big_text/{lessonId}.mp3", content_type="audio/mpeg"
     )
+
+

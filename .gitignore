@@ -1,5 +1,7 @@
 /model/step_315496.onnx
 config.json
+inf_teacher.json
+copy_class_lesson.json
 .idea/*
 __pycache__
 venv
