@@ -65,3 +65,8 @@ class ResultGame(BaseModel):
     item_id: int      #Id предложения или слова,
     exerciseType: str #тип задания
     result: bool      #результат
+
+
+class NewStudent(BaseModel):
+    classId: int
+    studentName: str

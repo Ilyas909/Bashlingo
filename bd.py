@@ -12,7 +12,8 @@ from razdel import sentenize
 from starlette.staticfiles import StaticFiles
 from nail_tts import main
 from starlette.responses import JSONResponse
-from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, ResultGame
+from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, ResultGame, \
+    NewStudent
 import logging
 
 
@@ -1130,3 +1131,36 @@ def clone_class(classId: EntityId, userId: int):
             conn.commit()
     cursor.close()
     conn.close()
+
+
+
+def add_new_student_class(inf_student: NewStudent):
+    conn = sqlite3.connect('text.db')
+    cursor = conn.cursor()
+    try:
+        for i in range(len(inf_student.studentName)):
+            username = transliterate_bashkir_name(inf_student.studentName[i])
+            res = 1
+            k = 0
+            login = username
+            while res != None:
+                login = username + str(k)
+                k += 1
+                res = cursor.execute('SELECT id FROM student WHERE username = ?;', (login,)).fetchone()
+            username = login
+            password = ''.join(random.choice('0123456789') for i in range(6))
+
+            cursor.execute('INSERT INTO student (name, class_id, username, password) VALUES (?, ?, ?, ?);',
+                           (inf_student.studentName[i], inf_student.classId, username, password))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        data = inf_student.classId
+        return get_class_info_by_id(EntityId(id=data))
+    except Exception as e:
+        # Если произошла ошибка, откатываем изменения
+        logger.error(f"Ошибка: {e}")
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return JSONResponse(status_code=500, content={"message": e})

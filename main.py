@@ -8,13 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request
 from api import Login, UserID, NewClass, NewName, NewNameStudent, EntityId, GetWords, Entityt, User, AudioFile, \
-    ResultGame
+    ResultGame, NewStudent
 from bd import user_exists_by_credentials, get_user_by_id, get_clssList_by_teacherID, add_new_classdb, \
     add_new_studentdb, get_class_info_by_id, update_class_namedb, update_student_namedb, delete_student, \
     get_class_lessons_by_id, add_lesson, get_lessons_by_studentId, get_lesson_menu_by_lessonId, get_lesson_by_id, \
     lesson_availability, delete_lesson_by_id, fetch_lesson_results, username_update, get_username, save_avatar, \
     check_student, image_words, get_poem_audio, get_text_audio, edit_lesson_lessonId, check_image, get_sentence, \
-    get_speaking, task_result, clone_class
+    get_speaking, task_result, clone_class, add_new_student_class
 import json
 from fastapi.staticfiles import StaticFiles
 from email import message_from_bytes
@@ -462,6 +462,15 @@ def clone_classes(classId: EntityId, request: Request):
         return userId
 
 
+@app.put('/classes/add-student/')
+def add_student_class(inf_student: NewStudent, request: Request):
+    userId = get_current_teacher(request)
+    if not isinstance(userId, JSONResponse):
+        inf_student.studentName = [item.strip() for item in re.split(',|\n', inf_student.studentName) if item.strip()]
+        res = add_new_student_class(inf_student)
+        return res
+    else:
+        return userId
 
 
 
