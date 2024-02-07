@@ -232,7 +232,7 @@ def get_class_lessons_by_id(class_id: EntityId):
     conn.close()
     if lesson_list:
         return {"lessons": [
-            {"id": lesson[0], "title": lesson[2], "link": 'https://eng.aiteacher.ru/lesson/' + str(lesson[0]),
+            {"id": lesson[0], "title": lesson[2], "link": f'https://bashtel.online/lesson/{lesson[0]}',
              "date": lesson[8], "available": lesson[9]} for lesson in lesson_list]}
     else:
         return {"lessons": []}
@@ -503,7 +503,7 @@ def lesson_availability(availability: Entityt):
     lesson = cursor.execute('SELECT * FROM lessons_list WHERE id = ?;', (availability.lessonId,)).fetchone()
     cursor.close()
     conn.close()
-    return {"id": lesson[0], "title": lesson[2], "link": 'https://eng.aiteacher.ru/lesson/' + str(lesson[0]),
+    return {"id": lesson[0], "title": lesson[2], "link": f'https://bashtel.online/lesson/{lesson[0]}',
             "date": lesson[8], "available": lesson[9]}
 
 
