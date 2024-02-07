@@ -436,11 +436,11 @@ def create_item(request: Request):
 @app.get("/lesson-menu/{lessonId}")
 def get_lesson_menu(lessonId: int, request: Request):
     userId = get_current_user(request)
-    if not isinstance(userId, JSONResponse):
+    if not isinstance(userId[0], JSONResponse):
         lesson_menu = get_lesson_menu_by_lessonId(lessonId, userId[0].id)
         return lesson_menu
     else:
-        return userId
+        return userId[0]
 
 @app.put('/tasks/sentence/result')
 def result_tasks(result: ResultGame, request: Request):
