@@ -386,7 +386,7 @@ def get_lessons_by_studentId(studentId):
     if classId:
         classId = int(classId[0])
     else:
-        return JSONResponse(status_code=200, content={"message": "Ошибка"})
+        return JSONResponse(status_code=404, content={"message": "Ошибка"})
     lesson_list = cursor.execute('SELECT * FROM lessons_list WHERE class_id = ? AND available = true;',
                                  (classId,)).fetchall()
     cursor.close()
@@ -534,7 +534,7 @@ def delete_lesson_by_id(lesson_id: int, classId: int):
 
             return JSONResponse(status_code=200, content={"message": "Урок удален"})
         else:
-            return JSONResponse(status_code=400, content={"message": "Неверный classId"})
+            return JSONResponse(status_code=404, content={"message": "Неверный classId"})
     except Exception as e:
         logger.error(f"Ошибка: {e}")
         conn.rollback()
@@ -906,7 +906,7 @@ def get_text_audio(lessonId: int):
         return []
     except sqlite3.Error as e:
         logger.error(f"Ошибка: {e}")
-        return JSONResponse(status_code=500, content={"message": 'поиск не удался'})
+        return JSONResponse(status_code=500, content={"message": e})
 
 
 def edit_lesson_lessonId(new_lesson: GetWords):

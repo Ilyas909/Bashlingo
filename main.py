@@ -74,7 +74,7 @@ def get_current_user(request: Request):
     # Получаем пользователя по значению куки
     user_id, role = session_storage.get(cookie_session, (None, None))
     if user_id is None or role is None:
-        return JSONResponse(status_code=404, content={"message": "not found"}), None
+        return JSONResponse(status_code=401, content={"message": "not found"}), None
     return UserID(id=user_id), role
 
 
@@ -83,7 +83,7 @@ def get_current_teacher(request: Request):
     if role == 'teacher':
         return userId.id
     else:
-        return JSONResponse(status_code=404, content={"message": "not found"})
+        return JSONResponse(status_code=401, content={"message": "not found"})
 
 
 def get_current_student(request: Request):
@@ -91,7 +91,7 @@ def get_current_student(request: Request):
     if role == 'student':
         return userId.id
     else:
-        return JSONResponse(status_code=404, content={"message": "not found"})
+        return JSONResponse(status_code=401, content={"message": "not found"})
 
 
 @app.get("/auth/me")
@@ -178,9 +178,9 @@ def add_new_class(new_class: NewClass, request: Request):
                 list_class = get_clssList_by_teacherID(userId)
                 return {"classesList": list_class}
             else:
-                return JSONResponse(status_code=404, content={"message": "not found"})
+                return JSONResponse(status_code=500, content={"message": "not found"})
         else:
-            return JSONResponse(status_code=404, content={"message": "not found"})
+            return JSONResponse(status_code=500, content={"message": "not found"})
     else:
         return userId
 
@@ -365,7 +365,7 @@ def get_correspondence_tasks(lessonId: int, request: Request):
     if check:
         res = image_words(lessonId, userId)
         return res
-    return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
+    return JSONResponse(status_code=401, content={"message": 'пользователь не авторизован'})
 
 
 @app.get('/tasks/sentence/{lessonId}')
@@ -375,7 +375,7 @@ def get_sentence_tasks(lessonId: int, request: Request):
     if check:
         res = get_sentence(lessonId, userId)
         return res
-    return JSONResponse(status_code=404, content={"message": 'пользователь не авторизован'})
+    return JSONResponse(status_code=401, content={"message": 'пользователь не авторизован'})
 
 
 @app.get('/tasks/speaking/{lessonId}')
@@ -385,7 +385,7 @@ def get_speaking_tasks(lessonId: int, request: Request):
     if check:
         res = get_speaking(lessonId, userId)
         return res
-    return JSONResponse(status_code=404, content={"message": 'пользователь не авторизован'})
+    return JSONResponse(status_code=401, content={"message": 'пользователь не авторизован'})
 
 
 
@@ -411,7 +411,7 @@ def get_poem(lessonId: int, request: Request):
     if check:
         res = get_poem_audio(lessonId)
         return res
-    return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
+    return JSONResponse(status_code=401, content={"message": 'пользователь не авторизован'})
 
 
 @app.get('/tasks/text/{lessonId}')
@@ -420,7 +420,7 @@ def get_text(lessonId: int, request: Request):
     if check:
         res = get_text_audio(lessonId)
         return res
-    return JSONResponse(status_code=500, content={"message": 'пользователь не авторизован'})
+    return JSONResponse(status_code=401, content={"message": 'пользователь не авторизован'})
 
 
 @app.get("/lessons-list")
